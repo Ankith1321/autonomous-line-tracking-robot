@@ -1,0 +1,5 @@
+[console_scripts]
+controller = line_follower.controller:main
+line_detector = line_follower.line_detector:main
+simple_node = line_follower.simple_node:main
+
