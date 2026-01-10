@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'line_follower'
 
@@ -10,23 +12,23 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'),
+         glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='root',
-    maintainer_email='root@todo.todo',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer='ankith',
+    maintainer_email='ankith@todo.todo',
+    description='Line following with camera and obstacle avoidance using TurtleBot3',
+    license='Apache License 2.0',
     extras_require={
-        'test': [
-            'pytest',
-        ],
+        'test': ['pytest'],
     },
     entry_points={
         'console_scripts': [
-                 'simple_node = line_follower.simple_node:main',
-                    'controller = line_follower.controller:main',
-                    'line_detector = line_follower.line_detector:main',
+            'line_detector = line_follower.line_detector:main',
+            'line_controller = line_follower.controller:main',
+            'simple_node = line_follower.simple_node:main',
         ],
     },
 )
