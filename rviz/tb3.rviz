@@ -1,0 +1,104 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: odom
+    Frame Rate: 30
+
+  Displays:
+
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Plane Cell Count: 30
+      Color: 160; 160; 160
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Plane: XY
+      Reference Frame: <Fixed Frame>
+
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Frame Timeout: 10
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Marker Scale: 0.5
+      Update Interval: 0
+
+    # Clear “robot orientation” indicator (big XYZ axes at robot body)
+    - Class: rviz_default_plugins/Axes
+      Name: Robot Axes (base_link)
+      Enabled: true
+      Reference Frame: base_link
+      Length: 0.6
+      Radius: 0.05
+
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Alpha: 1
+      Description Source: Topic
+      Description Topic: /robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+      Update Interval: 0
+
+    # Very intuitive pose arrow for non-ROS viewers
+    - Class: rviz_default_plugins/Odometry
+      Name: Odometry Arrow
+      Enabled: true
+      Topic: /odom
+      Keep: 1
+      Color: 255; 255; 0
+      Shape:
+        Value: Arrow
+      Covariance:
+        Position: false
+        Orientation: false
+      Position Tolerance: 0.0
+      Angle Tolerance: 0.0
+
+    # Make scan easy to see (bigger points)
+    - Class: rviz_default_plugins/LaserScan
+      Name: LaserScan
+      Enabled: true
+      Topic: /scan
+      Queue Size: 10
+      Reliability Policy: Reliable
+      Style: Points
+      Size (Pixels): 6
+      Size (m): 0.05
+      Color: 255; 0; 0
+      Decay Time: 0
+      Use rainbow: false
+      Position Transformer: XYZ
+
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Orbit
+      Target Frame: base_link
+      Distance: 6
+      Pitch: 0.8
+      Yaw: 0.8
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
+
