@@ -15,3 +15,14 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+_disabled_src/
+
+# Vendor repos (cloned dependencies)
+src/turtlebot3/
+src/turtlebot3_msgs/
+src/turtlebot3_simulations/
+
+# Build artifacts
+build/
+install/
+log/
