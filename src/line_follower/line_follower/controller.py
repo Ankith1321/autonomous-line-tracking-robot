@@ -12,7 +12,7 @@ class LineController(Node):
         super().__init__("line_controller")
 
         # Parameters (easy to tune)
-        self.declare_parameter("linear_x", 0.08)      # m/s
+        self.declare_parameter("linear_x", 0.15)      # m/s
         self.declare_parameter("k_p", 0.012)          # proportional gain
         self.declare_parameter("max_ang_z", 1.0)      # rad/s
         self.declare_parameter("steer_sign", 1.0)     # set -1.0 if steering is reversed
