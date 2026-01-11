@@ -8,21 +8,13 @@ __pycache__/
 *.pyc
 *.pyo
 
-# IDE/editor
+# IDE / editor
 .vscode/
 .idea/
 
-# OS
+# OS junk
 .DS_Store
 Thumbs.db
+
+# Optional disabled sources
 _disabled_src/
-
-# Vendor repos (cloned dependencies)
-src/turtlebot3/
-src/turtlebot3_msgs/
-src/turtlebot3_simulations/
-
-# Build artifacts
-build/
-install/
-log/
