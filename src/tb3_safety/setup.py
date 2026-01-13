@@ -22,6 +22,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'obstacle_avoid = tb3_safety.obstacle_avoid:main',
             # FORMAT: executable_name = package.module:function
             'obstacle_stop = tb3_safety.obstacle_stop:main',
         ],

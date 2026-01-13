@@ -18,3 +18,11 @@ Thumbs.db
 
 # Optional disabled sources
 _disabled_src/
+# colcon / runtime
+build/
+install/
+log/
+_RUN/
+*.pyc
+__pycache__/
+src/turtlebot3_simulations/

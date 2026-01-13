@@ -10,7 +10,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {'scan_topic': '/scan'},
-                {'cmd_vel_topic': '/cmd_vel'},
+                {'cmd_vel_topic': '/cmd_vel_obstacle'},
                 {'front_half_angle_deg': 20.0},
                 {'stop_distance': 0.35},
                 {'forward_speed': 0.08},
