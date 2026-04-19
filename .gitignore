@@ -1,28 +1,10 @@
-# ROS 2 / colcon build artifacts
 build/
 install/
 log/
-
-# Python cache
 __pycache__/
 *.pyc
 *.pyo
-
-# IDE / editor
+*.swp
 .vscode/
 .idea/
-
-# OS junk
 .DS_Store
-Thumbs.db
-
-# Optional disabled sources
-_disabled_src/
-# colcon / runtime
-build/
-install/
-log/
-_RUN/
-*.pyc
-__pycache__/
-src/turtlebot3_simulations/
