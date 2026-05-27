@@ -9,22 +9,22 @@ from geometry_msgs.msg import Twist
 
 class ObstacleStop(Node):
     """
-    Simple safety controller:
+    VETO-ONLY safety node:
     - Subscribes to /scan
-    - Finds the closest obstacle in a front sector (+/- angle)
-    - Publishes /cmd_vel: stops if too close, otherwise drives forward
-    - Logs only when state changes (STOP <-> GO) to avoid spam
+    - Computes closest obstacle in front sector (+/- angle)
+    - Publishes /cmd_vel_obstacle:
+        * STOP (0,0) when obstacle is too close
+        * nothing when clear, so the mux can use /cmd_vel_raw
     """
 
     def __init__(self):
         super().__init__('obstacle_stop')
 
-        # Parameters (tunable)
+        # Parameters
         self.declare_parameter('scan_topic', '/scan')
-        self.declare_parameter('cmd_vel_topic', '/cmd_vel')
-        self.declare_parameter('front_half_angle_deg', 20.0)   # +/- degrees around forward direction
-        self.declare_parameter('stop_distance', 0.35)          # meters
-        self.declare_parameter('forward_speed', 0.08)          # m/s
+        self.declare_parameter('cmd_vel_topic', '/cmd_vel_obstacle')
+        self.declare_parameter('front_half_angle_deg', 20.0)
+        self.declare_parameter('stop_distance', 0.35)
         self.declare_parameter('publish_rate_hz', 10.0)
 
         self.scan_topic = self.get_parameter('scan_topic').get_parameter_value().string_value
@@ -33,11 +33,10 @@ class ObstacleStop(Node):
             self.get_parameter('front_half_angle_deg').get_parameter_value().double_value
         )
         self.stop_distance = self.get_parameter('stop_distance').get_parameter_value().double_value
-        self.forward_speed = self.get_parameter('forward_speed').get_parameter_value().double_value
         self.publish_rate = self.get_parameter('publish_rate_hz').get_parameter_value().double_value
 
         # State
-        self.latest_min_front = None  # float or None
+        self.latest_min_front = None
         self.is_stopped = False
 
         # ROS I/O
@@ -46,16 +45,12 @@ class ObstacleStop(Node):
         self.timer = self.create_timer(1.0 / self.publish_rate, self.on_timer)
 
         self.get_logger().info(
-            f"ObstacleStop running. scan={self.scan_topic}, cmd_vel={self.cmd_vel_topic}, "
+            f"ObstacleStop (VETO) running. scan={self.scan_topic}, cmd_vel={self.cmd_vel_topic}, "
             f"front_half_angle_deg={math.degrees(self.front_half_angle):.1f}, "
-            f"stop_distance={self.stop_distance:.2f}, forward_speed={self.forward_speed:.2f}"
+            f"stop_distance={self.stop_distance:.2f}"
         )
 
     def on_scan(self, msg: LaserScan):
-        """
-        Compute the minimum finite range in the front sector.
-        TurtleBot3 LaserScan in Gazebo typically has angle=0 as forward.
-        """
         min_front = float('inf')
 
         angle = msg.angle_min
@@ -66,12 +61,10 @@ class ObstacleStop(Node):
                     min_front = min(min_front, r)
             angle += msg.angle_increment
 
-        # If nothing finite, keep inf (meaning clear within sensor max range)
         self.latest_min_front = min_front
 
     @staticmethod
     def _wrap_to_pi(a: float) -> float:
-        """Normalize angle to [-pi, pi]."""
         while a > math.pi:
             a -= 2.0 * math.pi
         while a < -math.pi:
@@ -79,31 +72,26 @@ class ObstacleStop(Node):
         return a
 
     def on_timer(self):
-        twist = Twist()
-
-        # If no scan received yet, publish zero for safety
+        # If no scan yet, do not claim the obstacle channel.
         if self.latest_min_front is None:
-            self.pub.publish(twist)
             return
 
         should_stop = self.latest_min_front < self.stop_distance
 
         if should_stop:
-            twist.linear.x = 0.0
-            twist.angular.z = 0.0
-            self.pub.publish(twist)
+            out = Twist()
+            out.linear.x = 0.0
+            out.angular.z = 0.0
+            self.pub.publish(out)
 
             if not self.is_stopped:
                 self.get_logger().warn(f"STOP: obstacle at {self.latest_min_front:.2f} m")
                 self.is_stopped = True
         else:
-            twist.linear.x = self.forward_speed
-            twist.angular.z = 0.0
-            self.pub.publish(twist)
-
             if self.is_stopped:
-                # If min_front is inf, format will show "inf" which is fine.
-                self.get_logger().info(f"GO: path clear (min_front={self.latest_min_front:.2f})")
+                self.get_logger().info(
+                    f"CLEAR: path clear (min_front={self.latest_min_front:.2f})"
+                )
                 self.is_stopped = False
 
 
