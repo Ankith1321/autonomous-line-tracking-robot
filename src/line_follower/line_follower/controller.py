@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import math
 
 import rclpy
 from rclpy.node import Node
@@ -9,84 +10,93 @@ from geometry_msgs.msg import Twist
 
 class LineController(Node):
     def __init__(self):
-        super().__init__("line_controller")
+        super().__init__('line_controller')
 
-        # Parameters (easy to tune)
-        self.declare_parameter("linear_x", 0.15)      # m/s
-        self.declare_parameter("k_p", 0.012)          # proportional gain
-        self.declare_parameter("max_ang_z", 1.0)      # rad/s
-        self.declare_parameter("steer_sign", 1.0)     # set -1.0 if steering is reversed
+        self.declare_parameter('linear_x', 0.08)
+        self.declare_parameter('min_linear_x', 0.02)
+        self.declare_parameter('k_p', 0.004)
+        self.declare_parameter('max_ang_z', 0.30)
+        self.declare_parameter('steer_sign', -1.0)
+        self.declare_parameter('lost_sentinel', -1000.0)
+        self.declare_parameter('search_w', 0.18)
+        self.declare_parameter('search_linear_x', 0.0)
+        self.declare_parameter('slowdown_error', 80.0)
+        self.declare_parameter('turn_in_place_error', 240.0)
+        self.declare_parameter('error_deadband', 10.0)
+        self.declare_parameter('angular_alpha', 0.35)
 
-        # Obstacle override
-        self.declare_parameter("obst_timeout_sec", 0.3)
-
-        self._linear_x = float(self.get_parameter("linear_x").value)
-        self._k_p = float(self.get_parameter("k_p").value)
-        self._max_ang_z = float(self.get_parameter("max_ang_z").value)
-        self._steer_sign = float(self.get_parameter("steer_sign").value)
-        self._obst_timeout_sec = float(self.get_parameter("obst_timeout_sec").value)
-
-        # Publisher to robot velocity command
-        self._cmd_pub = self.create_publisher(Twist, "/cmd_vel", 10)
-
-        # Sub to line error
-        self._err_sub = self.create_subscription(
-            Float32,
-            "/line_error",
-            self._on_error,
-            10,
+        self.linear_x = float(self.get_parameter('linear_x').value)
+        self.min_linear_x = float(self.get_parameter('min_linear_x').value)
+        self.k_p = float(self.get_parameter('k_p').value)
+        self.max_ang_z = float(self.get_parameter('max_ang_z').value)
+        self.steer_sign = float(self.get_parameter('steer_sign').value)
+        self.lost_sentinel = float(self.get_parameter('lost_sentinel').value)
+        self.search_w = float(self.get_parameter('search_w').value)
+        self.search_linear_x = float(self.get_parameter('search_linear_x').value)
+        self.slowdown_error = float(self.get_parameter('slowdown_error').value)
+        self.turn_in_place_error = float(self.get_parameter('turn_in_place_error').value)
+        self.error_deadband = max(0.0, float(self.get_parameter('error_deadband').value))
+        self.angular_alpha = self.clamp(
+            float(self.get_parameter('angular_alpha').value), 0.0, 1.0
         )
 
-        # Sub to obstacle command (remapped turtlebot3_obstacle_detection output)
-        self._obst_sub = self.create_subscription(
-            Twist,
-            "/cmd_vel_obstacle",
-            self._on_obstacle_cmd,
-            10,
-        )
-        self._last_obst_cmd = Twist()
-        self._last_obst_time = self.get_clock().now()
+        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel_raw', 10)
+        self.err_sub = self.create_subscription(Float32, '/line_error', self.on_error, 10)
+        self.last_turn_sign = 1.0
+        self.last_angular_z = 0.0
 
         self.get_logger().info(
-            f"Controller started: linear_x={self._linear_x}, "
-            f"k_p={self._k_p}, max_ang_z={self._max_ang_z}, "
-            f"steer_sign={self._steer_sign}, obst_timeout_sec={self._obst_timeout_sec}"
+            f'Controller started: cmd_vel=/cmd_vel_raw, linear_x={self.linear_x}, '
+            f'min_linear_x={self.min_linear_x}, k_p={self.k_p}, max_ang_z={self.max_ang_z}, '
+            f'error_deadband={self.error_deadband}, angular_alpha={self.angular_alpha}'
         )
 
     @staticmethod
-    def _clamp(v: float, lo: float, hi: float) -> float:
-        return max(lo, min(hi, v))
+    def clamp(value: float, low: float, high: float) -> float:
+        return max(low, min(high, value))
 
-    def _on_obstacle_cmd(self, msg: Twist) -> None:
-        self._last_obst_cmd = msg
-        self._last_obst_time = self.get_clock().now()
-
-    def _on_error(self, msg: Float32) -> None:
+    def on_error(self, msg: Float32) -> None:
         err = float(msg.data)
+        cmd = Twist()
 
-        twist = Twist()
-
-        # If detector reports "no line", stop for safety.
-        if err == -1.0:
-            twist.linear.x = 0.0
-            twist.angular.z = 0.0
-            self._cmd_pub.publish(twist)
+        if not math.isfinite(err) or err == self.lost_sentinel:
+            cmd.linear.x = self.search_linear_x
+            cmd.angular.z = self.last_turn_sign * self.search_w
+            self.last_angular_z = cmd.angular.z
+            self.cmd_pub.publish(cmd)
             return
 
-        # Proportional steering control
-        ang = self._steer_sign * self._k_p * err
-        ang = self._clamp(ang, -self._max_ang_z, self._max_ang_z)
+        if abs(err) <= self.error_deadband:
+            target_angular_z = 0.0
+        else:
+            target_angular_z = self.clamp(
+                self.steer_sign * self.k_p * err,
+                -self.max_ang_z,
+                self.max_ang_z,
+            )
 
-        twist.linear.x = self._linear_x
-        twist.angular.z = ang
+        angular_z = (
+            self.last_angular_z
+            + self.angular_alpha * (target_angular_z - self.last_angular_z)
+        )
+        angular_z = self.clamp(angular_z, -self.max_ang_z, self.max_ang_z)
+        self.last_angular_z = angular_z
+        if abs(angular_z) > 1e-4:
+            self.last_turn_sign = 1.0 if angular_z > 0.0 else -1.0
 
-        # Obstacle override: if obstacle node recently commanded stop/turn, prioritize it
-        dt = (self.get_clock().now() - self._last_obst_time).nanoseconds / 1e9
-        if dt < self._obst_timeout_sec:
-            if abs(self._last_obst_cmd.angular.z) > 0.05 or self._last_obst_cmd.linear.x < 0.02:
-                twist = self._last_obst_cmd
+        abs_error = abs(err)
+        if abs_error >= self.turn_in_place_error:
+            linear_x = 0.0
+        elif abs_error <= self.slowdown_error:
+            linear_x = self.linear_x
+        else:
+            span = max(1.0, self.turn_in_place_error - self.slowdown_error)
+            ratio = (abs_error - self.slowdown_error) / span
+            linear_x = self.linear_x - ratio * (self.linear_x - self.min_linear_x)
 
-        self._cmd_pub.publish(twist)
+        cmd.linear.x = max(0.0, linear_x)
+        cmd.angular.z = angular_z
+        self.cmd_pub.publish(cmd)
 
 
 def main(args=None):
@@ -97,16 +107,10 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        try:
-            node.destroy_node()
-        except Exception:
-            pass
-        try:
-            if rclpy.ok():
-                rclpy.shutdown()
-        except Exception:
-            pass
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

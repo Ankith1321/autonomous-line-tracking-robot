@@ -10,6 +10,7 @@ pkill -f "ros2 launch" || true
 pkill -f "line_detector" || true
 pkill -f "line_controller" || true
 pkill -f "obstacle_stop" || true
+pkill -f "obstacle_avoid" || true
 pkill -f "cmd_vel_mux.py" || true
 pkill -f "gzserver" || true
 pkill -f "gzclient" || true
@@ -23,6 +24,7 @@ pkill -9 -f "gzclient" || true
 pkill -9 -f "gazebo" || true
 pkill -9 -f "turtlebot3" || true
 pkill -9 -f "camera_driver" || true
+pkill -9 -f "obstacle_avoid" || true
 pkill -9 -f "robot_state_publisher" || true
 pkill -9 -f "spawn_entity" || true
 pkill -9 -f "parameter_bridge" || true

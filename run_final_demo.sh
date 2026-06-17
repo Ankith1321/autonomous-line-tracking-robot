@@ -39,22 +39,12 @@ wait_for_topic /camera/image_raw 120
 wait_for_topic /scan 120
 
 echo "[AUTONOMY_LINE] Starting line detector/controller..."
-ros2 launch line_follower line_follow.launch.py \
-  use_sim_time:=true \
-  roi_start:=0.60 \
-  fixed_thresh:=100 \
-  min_nonzero:=50 \
-  k_p:=0.003 \
-  max_ang_z:=0.10 \
-  linear_x:=0.005 \
-  search_w:=0.05 \
-  search_linear_x:=0.003 \
-  > "${LOG_DIR}/autonomy_line.log" 2>&1 &
+ros2 launch line_follower line_follow.launch.py   use_sim_time:=true   use_hsv:=true   roi_start:=0.60   min_nonzero:=50   hsv_lower_h:=15   hsv_lower_s:=80   hsv_lower_v:=80   hsv_upper_h:=40   hsv_upper_s:=255   hsv_upper_v:=255   min_contour_area:=250.0   max_contour_jump:=120.0   contour_switch_confirm_frames:=3   ema_alpha:=0.25   k_p:=0.003   steer_sign:=-1.0   max_ang_z:=0.20   linear_x:=0.03   min_linear_x:=0.01   search_w:=0.10   search_linear_x:=0.01   error_deadband:=12.0   angular_alpha:=0.30   > "${LOG_DIR}/autonomy_line.log" 2>&1 &
 echo "autonomy_line:$!" >> "${PID_FILE}"
 sleep 2
 
-echo "[SAFETY_OBSTACLE] Starting obstacle stop safety node..."
-ros2 launch tb3_safety obstacle_stop.launch.py use_sim_time:=true stop_distance:=0.20 > "${LOG_DIR}/safety_obstacle.log" 2>&1 &
+echo "[SAFETY_OBSTACLE] Starting obstacle avoidance node..."
+ros2 launch tb3_safety obstacle_avoid.launch.py   use_sim_time:=true   front_half_angle_deg:=25.0   side_sector_min_deg:=35.0   side_sector_max_deg:=100.0   avoid_distance:=0.35   clear_distance:=0.45   emergency_distance:=0.18   stop_time_sec:=0.30   turn_time_sec:=1.40   forward_time_sec:=0.90   turn_speed:=0.30   forward_speed:=0.03   > "${LOG_DIR}/safety_obstacle.log" 2>&1 &
 echo "safety_obstacle:$!" >> "${PID_FILE}"
 sleep 1
 

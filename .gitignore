@@ -8,3 +8,10 @@ __pycache__/
 .vscode/
 .idea/
 .DS_Store
+src/turtlebot3/
+src/turtlebot3_msgs/
+src/turtlebot3_simulations/
+build/
+install/
+log/
+logs/
