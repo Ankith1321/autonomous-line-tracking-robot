@@ -1,0 +1,92 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: odom
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Plane Cell Count: 20
+      Color: 120; 120; 120
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Plane: XY
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Frame Timeout: 10
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Marker Scale: 0.4
+      Update Interval: 0
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Alpha: 1
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+      Update Interval: 0
+    - Class: rviz_default_plugins/LaserScan
+      Name: LaserScan
+      Enabled: true
+      Topic:
+        Value: /scan
+      Queue Size: 10
+      Reliability Policy: Reliable
+      Style: Points
+      Size (Pixels): 5
+      Size (m): 0.04
+      Color: 255; 0; 0
+      Decay Time: 0
+      Use rainbow: false
+      Position Transformer: XYZ
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Demo World Markers
+      Enabled: true
+      Topic:
+        Value: /demo_world_markers
+      Queue Size: 10
+    - Class: rviz_default_plugins/Image
+      Name: Camera Image
+      Enabled: true
+      Topic:
+        Value: /camera/image_raw
+      Reliability Policy: Best Effort
+      Transport Hint: raw
+      Queue Size: 2
+      Normalize Range: true
+      Median window: 5
+      Min Value: 0
+      Max Value: 1
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Orbit
+      Target Frame: base_link
+      Distance: 6
+      Pitch: 0.75
+      Yaw: 0.75
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
