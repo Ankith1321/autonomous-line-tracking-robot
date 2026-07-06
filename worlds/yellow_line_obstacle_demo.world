@@ -32,15 +32,15 @@
       </link>
     </model>
 
-    <!-- Open final-demo track: no walls, no branches, no moving obstacle. -->
-    <model name="yellow_line_open_straight">
+    <!-- Production track: Clear 3.0m line from origin with obstacle at 1.5m -->
+    <model name="yellow_line_segment_start">
       <static>true</static>
-      <pose>0.0 0.0 0.012 0 0 0</pose>
+      <pose>1.5 0.0 0.012 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry>
             <box>
-              <size>7.2 0.16 0.014</size>
+              <size>3.0 0.16 0.014</size>
             </box>
           </geometry>
           <material>
@@ -52,11 +52,10 @@
       </link>
     </model>
 
-    <!-- Static obstacle placed so it overlaps the edge of the yellow line: -->
-    <!-- genuine path intrusion that forces real avoidance, not just a near-miss. -->
+    <!-- Static obstacle placed 1.5m ahead (clear of start, forces real avoidance) -->
     <model name="obstacle_box_static_offset">
       <static>true</static>
-      <pose>0.60 0.22 0.18 0 0 0.10</pose>
+      <pose>1.5 0.45 0.18 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
