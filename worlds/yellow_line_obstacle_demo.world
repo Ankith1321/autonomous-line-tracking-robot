@@ -52,10 +52,10 @@
       </link>
     </model>
 
-    <!-- Static obstacle placed 1.5m ahead (clear of start, forces real avoidance) -->
+    <!-- Static obstacle directly on line center (perfect blocking position) -->
     <model name="obstacle_box_static_offset">
       <static>true</static>
-      <pose>1.5 0.45 0.18 0 0 0</pose>
+      <pose>1.5 0.0 0.18 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>

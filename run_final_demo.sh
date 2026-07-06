@@ -49,12 +49,12 @@ wait_for_topic /camera/image_raw 120
 wait_for_topic /scan 120
 
 echo "[AUTONOMY_LINE] Starting line detector/controller..."
-ros2 launch line_follower line_follow.launch.py   use_sim_time:=true   use_hsv:=false   use_adaptive:=false   line_is_dark:=false   roi_start:=0.60   fixed_thresh:=90   min_nonzero:=30   min_contour_area:=100.0   max_contour_jump:=120.0   contour_switch_confirm_frames:=3   ema_alpha:=0.25   max_fill_ratio:=0.75   k_p:=0.0025   steer_sign:=-1.0   max_ang_z:=0.18   linear_x:=0.15   min_linear_x:=0.08   search_w:=0.07   search_linear_x:=0.05   error_deadband:=12.0   angular_alpha:=0.35   > "${LOG_DIR}/autonomy_line.log" 2>&1 &
+ros2 launch line_follower line_follow.launch.py   use_sim_time:=true   use_hsv:=true   line_is_dark:=false   roi_start:=0.60   hsv_lower_h:=15   hsv_lower_s:=80   hsv_lower_v:=80   hsv_upper_h:=40   hsv_upper_s:=255   hsv_upper_v:=255   fixed_thresh:=90   min_nonzero:=30   min_contour_area:=100.0   max_contour_jump:=120.0   contour_switch_confirm_frames:=3   ema_alpha:=0.25   max_fill_ratio:=0.75   k_p:=0.0040   steer_sign:=-1.0   max_ang_z:=0.18   linear_x:=0.15   min_linear_x:=0.08   search_w:=0.07   search_linear_x:=0.03   error_deadband:=10.0   angular_alpha:=0.35   lost_timeout_sec:=6.0   > "${LOG_DIR}/autonomy_line.log" 2>&1 &
 record_pid "autonomy_line" "$!"
 sleep 2
 
 echo "[OBSTACLE_AVOID] Starting static obstacle avoidance..."
-ros2 launch tb3_safety obstacle_avoid.launch.py   use_sim_time:=true   front_half_angle_deg:=25.0   side_sector_min_deg:=30.0   side_sector_max_deg:=120.0   avoid_distance:=0.95   clear_distance:=1.05   emergency_distance:=0.50   side_clearance_min:=0.20   stop_time_sec:=0.10   turn_time_sec:=1.50   forward_time_sec:=6.00   forward_min_distance:=0.32   min_turn_away_time_sec:=0.60   turn_back_time_sec:=3.00   turn_back_yaw_tolerance_deg:=5.0   turn_speed:=0.35   forward_speed:=0.15   rejoin_speed:=0.12   search_rejoin_speed:=0.10   search_rejoin_turn_speed:=0.15   rejoin_kp:=0.0025   rejoin_block_distance:=0.50   rejoin_release_distance:=0.58   rejoin_block_confirm_frames:=3   rejoin_block_turn_sec:=0.60   rejoin_max_ang:=0.18   line_rejoin_error_thresh:=35.0   line_rejoin_confirm_frames:=8   max_rejoin_time_sec:=5.0   > "${LOG_DIR}/safety_obstacle.log" 2>&1 &
+ros2 launch tb3_safety obstacle_avoid.launch.py   use_sim_time:=true   front_half_angle_deg:=25.0   side_sector_max_deg:=170.0   lidar_to_hull_margin:=0.20   avoid_distance:=0.95   emergency_distance:=0.25   stop_time_sec:=0.60   back_off_speed:=0.12   turn_direction_hysteresis_m:=0.10   turn_speed:=0.30   turn_time_sec:=2.30   forward_speed:=0.12   forward_distance_m:=2.20   forward_time_sec:=15.00   yaw_tolerance_deg:=5.0   search_turn_speed:=0.12   line_search_error_threshold:=20.0   line_search_confirm_count:=8   search_max_yaw_deviation_deg:=130.0   search_timeout_sec:=45.0   > "${LOG_DIR}/safety_obstacle.log" 2>&1 &
 record_pid "obstacle_avoid" "$!"
 sleep 1
 

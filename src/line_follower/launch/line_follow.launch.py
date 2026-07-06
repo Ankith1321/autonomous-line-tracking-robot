@@ -44,6 +44,7 @@ def generate_launch_description():
     turn_in_place_error_arg = DeclareLaunchArgument("turn_in_place_error", default_value="240.0")
     error_deadband_arg = DeclareLaunchArgument("error_deadband", default_value="10.0")
     angular_alpha_arg = DeclareLaunchArgument("angular_alpha", default_value="0.35")
+    lost_timeout_arg = DeclareLaunchArgument("lost_timeout_sec", default_value="6.0")
 
     detector = Node(
         package="line_follower",
@@ -95,6 +96,7 @@ def generate_launch_description():
             "turn_in_place_error": LaunchConfiguration("turn_in_place_error"),
             "error_deadband": LaunchConfiguration("error_deadband"),
             "angular_alpha": LaunchConfiguration("angular_alpha"),
+            "lost_timeout_sec": LaunchConfiguration("lost_timeout_sec"),
         }],
     )
 
@@ -133,6 +135,7 @@ def generate_launch_description():
         turn_in_place_error_arg,
         error_deadband_arg,
         angular_alpha_arg,
+        lost_timeout_arg,
         detector,
         controller,
     ])

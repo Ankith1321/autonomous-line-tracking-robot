@@ -94,6 +94,7 @@ class LineDetector(Node):
         self._pending_cx = None
         self._pending_count = 0
         self._last_log_t = 0.0
+        self._publish_timer = self.create_timer(0.1, self._publish_latest)
 
     def _publish_latest(self):
         self.err_pub.publish(Float32(data=float(self._last_error)))
@@ -229,8 +230,6 @@ class LineDetector(Node):
                 alpha = max(0.0, min(1.0, self._ema_alpha))
                 self._filtered_error = alpha * raw_error + (1.0 - alpha) * self._filtered_error
             self._last_error = self._filtered_error
-
-        self._publish_latest()
 
         now = time.monotonic()
         if now - self._last_log_t > 1.0:
