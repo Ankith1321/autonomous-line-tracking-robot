@@ -6,6 +6,7 @@ from rclpy.duration import Duration
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
 from std_msgs.msg import Float32
 
 
@@ -50,33 +51,42 @@ class ObstacleAvoid(Node):
         super().__init__('obstacle_avoid')
 
         self.declare_parameter('scan_topic', '/scan')
+        self.declare_parameter('odom_topic', '/odom')
         self.declare_parameter('cmd_vel_topic', '/cmd_vel_obstacle')
         self.declare_parameter('line_error_topic', '/line_error')
-        self.declare_parameter('front_half_angle_deg', 30.0)
-        self.declare_parameter('side_sector_min_deg', 35.0)
-        self.declare_parameter('side_sector_max_deg', 100.0)
-        self.declare_parameter('avoid_distance', 1.00)
-        self.declare_parameter('clear_distance', 1.15)
+        self.declare_parameter('front_half_angle_deg', 25.0)
+        self.declare_parameter('side_sector_min_deg', 30.0)
+        self.declare_parameter('side_sector_max_deg', 120.0)
+        self.declare_parameter('avoid_distance', 0.95)
+        self.declare_parameter('clear_distance', 1.05)
         self.declare_parameter('emergency_distance', 0.50)
-        self.declare_parameter('stop_time_sec', 0.30)
-        self.declare_parameter('turn_time_sec', 1.35)
-        self.declare_parameter('forward_time_sec', 1.50)
-        self.declare_parameter('min_turn_away_time_sec', 0.75)
-        self.declare_parameter('turn_back_time_sec', 0.90)
-        self.declare_parameter('turn_speed', 0.25)
-        self.declare_parameter('forward_speed', 0.035)
-        self.declare_parameter('rejoin_speed', 0.03)
-        self.declare_parameter('search_rejoin_speed', 0.025)
-        self.declare_parameter('search_rejoin_turn_speed', 0.08)
+        self.declare_parameter('side_clearance_min', 0.35)
+        self.declare_parameter('stop_time_sec', 0.10)
+        self.declare_parameter('turn_time_sec', 1.50)
+        self.declare_parameter('forward_time_sec', 6.00)
+        self.declare_parameter('forward_min_distance', 0.32)
+        self.declare_parameter('min_turn_away_time_sec', 0.60)
+        self.declare_parameter('turn_back_time_sec', 3.00)
+        self.declare_parameter('turn_back_yaw_tolerance_deg', 5.0)
+        self.declare_parameter('turn_speed', 0.35)
+        self.declare_parameter('forward_speed', 0.15)
+        self.declare_parameter('rejoin_speed', 0.12)
+        self.declare_parameter('search_rejoin_speed', 0.10)
+        self.declare_parameter('search_rejoin_turn_speed', 0.15)
         self.declare_parameter('rejoin_kp', 0.0025)
+        self.declare_parameter('rejoin_block_distance', 0.50)
+        self.declare_parameter('rejoin_release_distance', 0.58)
+        self.declare_parameter('rejoin_block_confirm_frames', 3)
+        self.declare_parameter('rejoin_block_turn_sec', 0.60)
         self.declare_parameter('rejoin_max_ang', 0.18)
-        self.declare_parameter('line_rejoin_error_thresh', 75.0)
-        self.declare_parameter('line_rejoin_confirm_frames', 5)
-        self.declare_parameter('max_rejoin_time_sec', 6.0)
+        self.declare_parameter('line_rejoin_error_thresh', 35.0)
+        self.declare_parameter('line_rejoin_confirm_frames', 8)
+        self.declare_parameter('max_rejoin_time_sec', 5.0)
         self.declare_parameter('line_lost_sentinel', -1.0)
         self.declare_parameter('publish_rate_hz', 20.0)
 
         self.scan_topic = self.get_parameter('scan_topic').value
+        self.odom_topic = self.get_parameter('odom_topic').value
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         self.line_error_topic = self.get_parameter('line_error_topic').value
         self.front_half_angle = math.radians(float(self.get_parameter('front_half_angle_deg').value))
@@ -85,17 +95,26 @@ class ObstacleAvoid(Node):
         self.avoid_distance = float(self.get_parameter('avoid_distance').value)
         self.clear_distance = float(self.get_parameter('clear_distance').value)
         self.emergency_distance = float(self.get_parameter('emergency_distance').value)
+        self.side_clearance_min = float(self.get_parameter('side_clearance_min').value)
         self.stop_time = float(self.get_parameter('stop_time_sec').value)
         self.turn_time = float(self.get_parameter('turn_time_sec').value)
         self.forward_time = float(self.get_parameter('forward_time_sec').value)
+        self.forward_min_distance = float(self.get_parameter('forward_min_distance').value)
         self.min_turn_away_time = float(self.get_parameter('min_turn_away_time_sec').value)
         self.turn_back_time = float(self.get_parameter('turn_back_time_sec').value)
+        self.turn_back_yaw_tolerance = math.radians(
+            float(self.get_parameter('turn_back_yaw_tolerance_deg').value)
+        )
         self.turn_speed = float(self.get_parameter('turn_speed').value)
         self.forward_speed = float(self.get_parameter('forward_speed').value)
         self.rejoin_speed = float(self.get_parameter('rejoin_speed').value)
         self.search_rejoin_speed = float(self.get_parameter('search_rejoin_speed').value)
         self.search_rejoin_turn_speed = float(self.get_parameter('search_rejoin_turn_speed').value)
         self.rejoin_kp = float(self.get_parameter('rejoin_kp').value)
+        self.rejoin_block_distance = float(self.get_parameter('rejoin_block_distance').value)
+        self.rejoin_release_distance = float(self.get_parameter('rejoin_release_distance').value)
+        self.rejoin_block_confirm_frames = max(1, int(self.get_parameter('rejoin_block_confirm_frames').value))
+        self.rejoin_block_turn_sec = float(self.get_parameter('rejoin_block_turn_sec').value)
         self.rejoin_max_ang = float(self.get_parameter('rejoin_max_ang').value)
         self.line_rejoin_error_thresh = float(self.get_parameter('line_rejoin_error_thresh').value)
         self.line_rejoin_confirm_frames = max(1, int(self.get_parameter('line_rejoin_confirm_frames').value))
@@ -105,10 +124,15 @@ class ObstacleAvoid(Node):
 
         self.pub = self.create_publisher(Twist, self.cmd_vel_topic, 10)
         self.scan_sub = self.create_subscription(LaserScan, self.scan_topic, self.on_scan, 10)
+        self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.on_odom, 10)
         self.line_sub = self.create_subscription(Float32, self.line_error_topic, self.on_line_error, 10)
         self.timer = self.create_timer(1.0 / max(1.0, publish_rate), self.on_timer)
 
         self.last_scan = None
+        self.last_pose = None
+        self.last_yaw = None
+        self.forward_start_pose = None
+        self.turn_away_start_yaw = None
         self.last_line_error = self.line_lost_sentinel
         self.line_valid = False
         self.line_centered_frames = 0
@@ -121,12 +145,15 @@ class ObstacleAvoid(Node):
         self.logged_line_steering = False
         self.last_cmd_log_time = self.get_clock().now()
         self.last_scan_log_time = self.get_clock().now()
+        self.rejoin_turn_until = self.get_clock().now()
+        self.rejoin_blocked_count = 0
 
         self.get_logger().info(
             'ObstacleAvoid running: '
             f'avoid={self.avoid_distance:.2f}, clear={self.clear_distance:.2f}, '
             f'emergency={self.emergency_distance:.2f}, turn={self.turn_time:.2f}s, '
-            f'forward={self.forward_time:.2f}s, rejoin_speed={self.rejoin_speed:.3f}'
+            f'forward_min_distance={self.forward_min_distance:.2f}m, '
+            f'forward_time_cap={self.forward_time:.2f}s, rejoin_speed={self.rejoin_speed:.3f}'
         )
 
     @staticmethod
@@ -135,6 +162,21 @@ class ObstacleAvoid(Node):
 
     def on_scan(self, msg: LaserScan):
         self.last_scan = msg
+
+    def on_odom(self, msg: Odometry):
+        self.last_pose = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        q = msg.pose.pose.orientation
+        self.last_yaw = math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z),
+        )
+
+    def distance_traveled(self, reference_pose):
+        if reference_pose is None or self.last_pose is None:
+            return 0.0
+        dx = self.last_pose[0] - reference_pose[0]
+        dy = self.last_pose[1] - reference_pose[1]
+        return math.hypot(dx, dy)
 
     def on_line_error(self, msg: Float32):
         err = float(msg.data)
@@ -155,6 +197,12 @@ class ObstacleAvoid(Node):
             self.line_centered_frames = 0
             self.rejoin_timeout_logged = False
             self.logged_line_steering = False
+            self.rejoin_turn_until = self.state_until
+            self.rejoin_blocked_count = 0
+        if state == self.FORWARD_AROUND:
+            self.forward_start_pose = self.last_pose
+        if state == self.TURN_AWAY:
+            self.turn_away_start_yaw = self.last_yaw
 
     def scan_distances(self):
         msg = self.last_scan
@@ -295,7 +343,8 @@ class ObstacleAvoid(Node):
             return
 
         if self.state == self.FORWARD_AROUND:
-            if front < self.avoid_distance:
+            side_min = min(left, right)
+            if front < self.avoid_distance or side_min < self.side_clearance_min:
                 reason = self.choose_turn(front_left, front_right, left, right)
                 self.get_logger().warn(
                     f'FORWARD_BLOCKED front={front:.2f} left={left:.2f} right={right:.2f} reason={reason}'
@@ -304,45 +353,105 @@ class ObstacleAvoid(Node):
                 self.publish(0.0, self.turn_dir * self.turn_speed)
                 return
             self.publish(self.forward_speed, 0.0)
-            if now >= self.state_until:
+            traveled = self.distance_traveled(self.forward_start_pose)
+            distance_met = traveled >= self.forward_min_distance
+            time_capped = now >= self.state_until
+            if distance_met or time_capped:
+                if time_capped and not distance_met:
+                    self.get_logger().warn(
+                        f'FORWARD_AROUND_TIME_CAP traveled={traveled:.2f}m '
+                        f'< required={self.forward_min_distance:.2f}m; proceeding on time cap'
+                    )
+                else:
+                    self.get_logger().info(f'FORWARD_AROUND_CLEARED traveled={traveled:.2f}m')
                 self.enter_state(self.TURN_BACK, self.turn_back_time)
                 self.get_logger().info('TURN_BACK')
             return
 
         if self.state == self.TURN_BACK:
             self.publish(0.0, -self.turn_dir * self.turn_speed)
-            if now >= self.state_until:
+            yaw_restored = False
+            if self.turn_away_start_yaw is not None and self.last_yaw is not None:
+                yaw_error = normalize_angle(self.last_yaw - self.turn_away_start_yaw)
+                yaw_restored = abs(yaw_error) <= self.turn_back_yaw_tolerance
+            time_capped = now >= self.state_until
+            if yaw_restored or time_capped:
+                if time_capped and not yaw_restored:
+                    self.get_logger().warn('TURN_BACK_TIME_CAP heading not fully restored; proceeding on time cap')
                 self.enter_state(self.SEARCH_LINE_FORWARD)
                 self.get_logger().info('SEARCH_LINE_FORWARD')
             return
 
         if self.state == self.SEARCH_LINE_FORWARD:
+            if now < self.rejoin_turn_until:
+                self.publish(0.0, self.turn_dir * self.turn_speed)
+                return
+
+            if front < self.emergency_distance or front < self.rejoin_block_distance:
+                self.rejoin_blocked_count += 1
+            else:
+                self.rejoin_blocked_count = 0
+
+            if self.rejoin_blocked_count >= self.rejoin_block_confirm_frames:
+                reason = self.choose_turn(front_left, front_right, left, right)
+                self.get_logger().warn(
+                    f'REJOIN_FRONT_BLOCKED front_min={front:.2f}; '
+                    f'count={self.rejoin_blocked_count}; '
+                    f'latched turn before rejoin reason={reason}'
+                )
+                self.line_centered_frames = 0
+                self.logged_line_steering = False
+                self.rejoin_blocked_count = 0
+                self.rejoin_turn_until = now + Duration(seconds=self.rejoin_block_turn_sec)
+                self.publish(0.0, self.turn_dir * self.turn_speed)
+                return
+
             if self.line_valid:
                 angular_z = self.clamp(-self.rejoin_kp * self.last_line_error, -self.rejoin_max_ang, self.rejoin_max_ang)
-                self.publish(self.rejoin_speed, angular_z)
+                abs_line_error = abs(self.last_line_error)
+                if abs_line_error > 180.0:
+                    linear_x = 0.0
+                    rejoin_mode = 'TURN_IN_PLACE_FAR_EDGE'
+                elif abs_line_error > 100.0:
+                    linear_x = min(self.search_rejoin_speed, self.rejoin_speed)
+                    rejoin_mode = 'SLOW_ARC_TO_LINE'
+                else:
+                    linear_x = self.rejoin_speed
+                    rejoin_mode = 'GUIDED_REJOIN'
+                self.get_logger().info(
+                    f'REJOIN_STEER mode={rejoin_mode} line_error={self.last_line_error:.1f} '
+                    f'linear.x={linear_x:.3f} angular.z={angular_z:.3f} '
+                    f'rejoin_blocked_count={self.rejoin_blocked_count}'
+                )
+                self.publish(linear_x, angular_z)
                 if not self.logged_line_steering:
                     self.get_logger().info('LINE_VISIBLE_STEERING_TO_REJOIN')
                     self.logged_line_steering = True
-                if self.line_centered_frames >= self.line_rejoin_confirm_frames and front > self.avoid_distance:
-                    self.get_logger().info('LINE_CENTERED')
-                    self.release_to_line_follower()
-                    return
-                if self.line_centered_frames >= self.line_rejoin_confirm_frames and front <= self.avoid_distance:
+                if self.line_centered_frames >= self.line_rejoin_confirm_frames:
+                    if front > self.rejoin_release_distance:
+                        self.get_logger().info('LINE_CENTERED')
+                        self.release_to_line_follower()
+                        return
+                    reason = self.choose_turn(front_left, front_right, left, right)
                     self.get_logger().warn(
-                        f'LINE_CENTERED_BUT_FRONT_BLOCKED front_min={front:.2f}; keeping obstacle control'
+                        f'LINE_CENTERED_BUT_FRONT_BLOCKED front_min={front:.2f}; '
+                        f'turning before release reason={reason}'
                     )
                     self.line_centered_frames = 0
+                    self.rejoin_blocked_count = 0
+                    self.rejoin_turn_until = now + Duration(seconds=self.rejoin_block_turn_sec)
+                    self.publish(0.0, self.turn_dir * self.turn_speed)
+                    return
             else:
                 self.publish(self.search_rejoin_speed, -self.turn_dir * self.search_rejoin_turn_speed)
                 self.logged_line_steering = False
 
-            if self.rejoin_elapsed(now) >= self.max_rejoin_time:
+            if self.rejoin_elapsed(now) >= self.max_rejoin_time and not self.rejoin_timeout_logged:
                 if self.line_valid:
                     self.get_logger().warn('REJOIN_TIMEOUT line visible but not centered; continuing guided rejoin')
-                    self.rejoin_timeout_logged = True
-                elif not self.rejoin_timeout_logged:
+                else:
                     self.get_logger().warn('REJOIN_TIMEOUT no centered line yet; continuing slow search')
-                    self.rejoin_timeout_logged = True
+                self.rejoin_timeout_logged = True
             return
 
 

@@ -1,13 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.6">
   <world name="yellow_line_obstacle_demo">
-
-    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
-      <ros>
-        <namespace>/</namespace>
-      </ros>
-      <update_rate>20.0</update_rate>
-    </plugin>
     <include>
       <uri>model://sun</uri>
     </include>
@@ -19,7 +12,7 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>8 6</size>
+              <size>9 5</size>
             </plane>
           </geometry>
         </collision>
@@ -27,117 +20,64 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>8 6</size>
+              <size>9 5</size>
             </plane>
           </geometry>
           <material>
-            <ambient>0.45 0.45 0.45 1</ambient>
-            <diffuse>0.45 0.45 0.45 1</diffuse>
+            <ambient>0.30 0.30 0.31 1</ambient>
+            <diffuse>0.32 0.32 0.33 1</diffuse>
+            <specular>0.05 0.05 0.05 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <model name="wall_north">
+    <!-- Open final-demo track: no walls, no branches, no moving obstacle. -->
+    <model name="yellow_line_open_straight">
       <static>true</static>
-      <pose>0 3.0 0.225 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>8.0 0.10 0.45</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>8.0 0.10 0.45</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse></material></visual>
-      </link>
-    </model>
-    <model name="wall_south">
-      <static>true</static>
-      <pose>0 -3.0 0.225 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>8.0 0.10 0.45</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>8.0 0.10 0.45</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse></material></visual>
-      </link>
-    </model>
-    <model name="wall_east">
-      <static>true</static>
-      <pose>4.0 0 0.225 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.10 6.0 0.45</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>0.10 6.0 0.45</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse></material></visual>
-      </link>
-    </model>
-    <model name="wall_west">
-      <static>true</static>
-      <pose>-4.0 0 0.225 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.10 6.0 0.45</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>0.10 6.0 0.45</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse></material></visual>
-      </link>
-    </model>
-
-    <!-- Short visual wall sections kept far from the first obstacle test area. -->
-    <model name="wall_inner_nw">
-      <static>true</static>
-      <pose>-2.7 2.0 0.20 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>1.2 0.10 0.40</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>1.2 0.10 0.40</size></box></geometry><material><ambient>0.65 0.65 0.65 1</ambient><diffuse>0.65 0.65 0.65 1</diffuse></material></visual>
-      </link>
-    </model>
-    <model name="wall_inner_ne">
-      <static>true</static>
-      <pose>2.7 1.7 0.20 0 0 1.5708</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>1.1 0.10 0.40</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>1.1 0.10 0.40</size></box></geometry><material><ambient>0.65 0.65 0.65 1</ambient><diffuse>0.65 0.65 0.65 1</diffuse></material></visual>
-      </link>
-    </model>
-    <model name="wall_inner_sw">
-      <static>true</static>
-      <pose>-3.1 -1.75 0.20 0 0 1.5708</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.9 0.10 0.40</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>0.9 0.10 0.40</size></box></geometry><material><ambient>0.65 0.65 0.65 1</ambient><diffuse>0.65 0.65 0.65 1</diffuse></material></visual>
-      </link>
-    </model>
-    <model name="wall_inner_se">
-      <static>true</static>
-      <pose>2.5 -1.9 0.20 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>1.1 0.10 0.40</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>1.1 0.10 0.40</size></box></geometry><material><ambient>0.65 0.65 0.65 1</ambient><diffuse>0.65 0.65 0.65 1</diffuse></material></visual>
-      </link>
-    </model>
-
-    <model name="yellow_line_main">
-      <static>true</static>
-      <pose>0 0 0.008 0 0 0</pose>
+      <pose>0.0 0.0 0.012 0 0 0</pose>
       <link name="link">
         <visual name="visual">
-          <geometry><box><size>6.4 0.18 0.012</size></box></geometry>
+          <geometry>
+            <box>
+              <size>7.2 0.16 0.014</size>
+            </box>
+          </geometry>
           <material>
-            <ambient>1.0 0.85 0.0 1</ambient>
-            <diffuse>1.0 0.85 0.0 1</diffuse>
-            <specular>0.1 0.1 0.0 1</specular>
+            <ambient>0.92 0.74 0.05 1</ambient>
+            <diffuse>0.95 0.78 0.05 1</diffuse>
+            <specular>0.05 0.05 0.02 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <model name="obstacle_cylinder_01_offset_on_line">
+    <!-- Static obstacle placed so it overlaps the edge of the yellow line: -->
+    <!-- genuine path intrusion that forces real avoidance, not just a near-miss. -->
+    <model name="obstacle_box_static_offset">
       <static>true</static>
-      <pose>-0.80 0.28 0.20 0 0 0</pose>
+      <pose>0.60 0.22 0.18 0 0 0.10</pose>
       <link name="link">
-        <collision name="collision"><geometry><cylinder><radius>0.14</radius><length>0.40</length></cylinder></geometry></collision>
-        <visual name="visual"><geometry><cylinder><radius>0.14</radius><length>0.40</length></cylinder></geometry><material><ambient>0.04 0.04 0.04 1</ambient><diffuse>0.04 0.04 0.04 1</diffuse></material></visual>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.30 0.30 0.36</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.30 0.30 0.36</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.80 0.32 0.03 1</ambient>
+            <diffuse>0.85 0.35 0.05 1</diffuse>
+            <specular>0.25 0.25 0.20 1</specular>
+          </material>
+        </visual>
       </link>
     </model>
-
-    <model name="dynamic_obstacle_box">
-      <static>false</static>
-      <pose>1.70 -0.55 0.18 0 0 0</pose>
-      <link name="link">
-        <gravity>false</gravity>
-        <collision name="collision"><geometry><box><size>0.28 0.28 0.36</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>0.28 0.28 0.36</size></box></geometry><material><ambient>0.1 0.1 0.9 1</ambient><diffuse>0.1 0.1 0.9 1</diffuse></material></visual>
-      </link>
-    </model>
-
   </world>
 </sdf>

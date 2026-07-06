@@ -12,14 +12,14 @@ class LineController(Node):
     def __init__(self):
         super().__init__('line_controller')
 
-        self.declare_parameter('linear_x', 0.08)
-        self.declare_parameter('min_linear_x', 0.02)
+        self.declare_parameter('linear_x', 0.15)
+        self.declare_parameter('min_linear_x', 0.08)
         self.declare_parameter('k_p', 0.004)
         self.declare_parameter('max_ang_z', 0.30)
         self.declare_parameter('steer_sign', -1.0)
         self.declare_parameter('lost_sentinel', -1000.0)
         self.declare_parameter('search_w', 0.18)
-        self.declare_parameter('search_linear_x', 0.0)
+        self.declare_parameter('search_linear_x', 0.05)
         self.declare_parameter('slowdown_error', 80.0)
         self.declare_parameter('turn_in_place_error', 240.0)
         self.declare_parameter('error_deadband', 10.0)
