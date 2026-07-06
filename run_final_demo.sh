@@ -49,7 +49,7 @@ wait_for_topic /camera/image_raw 120
 wait_for_topic /scan 120
 
 echo "[AUTONOMY_LINE] Starting line detector/controller..."
-ros2 launch line_follower line_follow.launch.py   use_sim_time:=true   use_hsv:=true   roi_start:=0.60   min_nonzero:=50   hsv_lower_h:=15   hsv_lower_s:=80   hsv_lower_v:=80   hsv_upper_h:=40   hsv_upper_s:=255   hsv_upper_v:=255   min_contour_area:=250.0   max_contour_jump:=120.0   contour_switch_confirm_frames:=3   ema_alpha:=0.25   max_fill_ratio:=0.70   k_p:=0.0025   steer_sign:=-1.0   max_ang_z:=0.18   linear_x:=0.15   min_linear_x:=0.08   search_w:=0.07   search_linear_x:=0.05   error_deadband:=12.0   angular_alpha:=0.35   > "${LOG_DIR}/autonomy_line.log" 2>&1 &
+ros2 launch line_follower line_follow.launch.py   use_sim_time:=true   use_hsv:=false   use_adaptive:=false   line_is_dark:=false   roi_start:=0.60   fixed_thresh:=90   min_nonzero:=30   min_contour_area:=100.0   max_contour_jump:=120.0   contour_switch_confirm_frames:=3   ema_alpha:=0.25   max_fill_ratio:=0.75   k_p:=0.0025   steer_sign:=-1.0   max_ang_z:=0.18   linear_x:=0.15   min_linear_x:=0.08   search_w:=0.07   search_linear_x:=0.05   error_deadband:=12.0   angular_alpha:=0.35   > "${LOG_DIR}/autonomy_line.log" 2>&1 &
 record_pid "autonomy_line" "$!"
 sleep 2
 

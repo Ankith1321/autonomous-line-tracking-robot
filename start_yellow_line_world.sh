@@ -7,7 +7,7 @@ export TURTLEBOT3_MODEL=waffle_pi
 
 WORLD_FILE=/ws/worlds/yellow_line_obstacle_demo.world
 ROBOT_MODEL=/opt/ros/humble/share/turtlebot3_gazebo/models/turtlebot3_waffle_pi/model.sdf
-ROBOT_START_X=-3.0
+ROBOT_START_X=0.0
 ROBOT_START_Y=0.0
 ROBOT_START_YAW=0.0
 
