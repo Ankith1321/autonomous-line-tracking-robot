@@ -12,7 +12,7 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>9 5</size>
+              <size>14 12</size>
             </plane>
           </geometry>
         </collision>
@@ -20,27 +20,26 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>9 5</size>
+              <size>14 12</size>
             </plane>
           </geometry>
           <material>
-            <ambient>0.30 0.30 0.31 1</ambient>
-            <diffuse>0.32 0.32 0.33 1</diffuse>
+            <ambient>0.34 0.34 0.35 1</ambient>
+            <diffuse>0.36 0.36 0.37 1</diffuse>
             <specular>0.05 0.05 0.05 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- Production track: Clear 3.0m line from origin with obstacle at 1.5m -->
-    <model name="yellow_line_segment_start">
+    <model name="yellow_line_horizontal">
       <static>true</static>
-      <pose>1.5 0.0 0.012 0 0 0</pose>
+      <pose>2.50 0.0 0.012 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry>
             <box>
-              <size>3.0 0.16 0.014</size>
+              <size>5.00 0.18 0.014</size>
             </box>
           </geometry>
           <material>
@@ -52,28 +51,72 @@
       </link>
     </model>
 
-    <!-- Static obstacle directly on line center (perfect blocking position) -->
-    <model name="obstacle_box_static_offset">
+    <model name="yellow_line_vertical">
       <static>true</static>
-      <pose>1.5 0.0 0.18 0 0 0</pose>
+      <pose>5.0 1.50 0.012 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.18 3.00 0.014</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.92 0.74 0.05 1</ambient>
+            <diffuse>0.95 0.78 0.05 1</diffuse>
+            <specular>0.05 0.05 0.02 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="obstacle_one">
+      <static>true</static>
+      <pose>2.20 0.20 0.16 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
             <box>
-              <size>0.30 0.30 0.36</size>
+              <size>0.24 0.24 0.32</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>0.30 0.30 0.36</size>
+              <size>0.24 0.24 0.32</size>
             </box>
           </geometry>
           <material>
-            <ambient>0.80 0.32 0.03 1</ambient>
-            <diffuse>0.85 0.35 0.05 1</diffuse>
-            <specular>0.25 0.25 0.20 1</specular>
+            <ambient>0.85 0.85 0.86 1</ambient>
+            <diffuse>0.90 0.90 0.91 1</diffuse>
+            <specular>0.12 0.12 0.12 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="obstacle_two">
+      <static>true</static>
+      <pose>4.88 1.70 0.16 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.22 0.22 0.32</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.22 0.22 0.32</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.85 0.85 0.86 1</ambient>
+            <diffuse>0.90 0.90 0.91 1</diffuse>
+            <specular>0.12 0.12 0.12 1</specular>
           </material>
         </visual>
       </link>

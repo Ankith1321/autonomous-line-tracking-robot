@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import math
+
 import rclpy
+from geometry_msgs.msg import Twist
 from rclpy.duration import Duration
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry
 from std_msgs.msg import Float32
 
 
@@ -22,109 +22,105 @@ def angle_in_sector(angle, start, end):
     return angle >= start or angle <= end
 
 
-def sector_min(ranges, angle_min, angle_inc, a0, a1):
+def sector_min(ranges, angle_min, angle_inc, start_angle, end_angle):
     minimum = float('inf')
-    for idx, val in enumerate(ranges):
-        if not math.isfinite(val) or val <= 0.0:
+    for idx, value in enumerate(ranges):
+        if not math.isfinite(value) or value <= 0.0:
             continue
         angle = angle_min + idx * angle_inc
-        if angle_in_sector(angle, a0, a1):
-            minimum = min(minimum, val)
+        if angle_in_sector(angle, start_angle, end_angle):
+            minimum = min(minimum, value)
     return minimum
 
 
 class ObstacleAvoid(Node):
     IDLE = 0
-    STOP = 1
-    TURN = 2
-    FORWARD = 3
-    TURN_BACK = 4
-    SEARCH_LINE = 5
+    TURN_AWAY = 1
+    FORWARD_AROUND = 2
+    REJOIN_LINE = 3
+
+    STATE_NAMES = {
+        IDLE: 'IDLE',
+        TURN_AWAY: 'TURN_AWAY',
+        FORWARD_AROUND: 'FORWARD_AROUND',
+        REJOIN_LINE: 'REJOIN_LINE',
+    }
 
     def __init__(self):
         super().__init__('obstacle_avoid')
-        self.declare_parameter('front_half_angle_deg', 25.0)
-        self.declare_parameter('side_sector_max_deg', 170.0)
-        self.declare_parameter('lidar_to_hull_margin', 0.20)
+
+        self.declare_parameter('front_half_angle_deg', 28.0)
+        self.declare_parameter('side_sector_min_deg', 30.0)
+        self.declare_parameter('side_sector_max_deg', 120.0)
         self.declare_parameter('avoid_distance', 0.95)
-        self.declare_parameter('emergency_distance', 0.25)
-        self.declare_parameter('stop_time_sec', 0.60)
-        self.declare_parameter('back_off_speed', 0.12)
-        self.declare_parameter('turn_direction_hysteresis_m', 0.10)
-        self.declare_parameter('turn_speed', 0.30)
-        self.declare_parameter('turn_time_sec', 2.30)
-        self.declare_parameter('forward_speed', 0.12)
-        self.declare_parameter('forward_distance_m', 2.20)
-        self.declare_parameter('forward_time_sec', 15.00)
-        self.declare_parameter('yaw_tolerance_deg', 5.0)
-        self.declare_parameter('search_turn_speed', 0.12)
-        self.declare_parameter('line_search_error_threshold', 20.0)
-        self.declare_parameter('line_search_confirm_count', 8)
-        self.declare_parameter('search_max_yaw_deviation_deg', 130.0)
-        self.declare_parameter('search_timeout_sec', 45.0)
+        self.declare_parameter('clear_distance', 1.10)
+        self.declare_parameter('forward_front_min', 0.85)
+        self.declare_parameter('emergency_distance', 0.45)
+        self.declare_parameter('side_clear_distance', 0.45)
+        self.declare_parameter('side_emergency_distance', 0.28)
+        self.declare_parameter('clear_confirm_frames', 3)
+        self.declare_parameter('turn_time_sec', 1.20)
+        self.declare_parameter('forward_time_sec', 1.50)
+        self.declare_parameter('turn_speed', 0.32)
+        self.declare_parameter('emergency_turn_speed', 0.42)
+        self.declare_parameter('forward_speed', 0.035)
+        self.declare_parameter('rejoin_speed', 0.030)
+        self.declare_parameter('search_rejoin_speed', 0.020)
+        self.declare_parameter('search_rejoin_turn_speed', 0.07)
+        self.declare_parameter('rejoin_kp', 0.0025)
+        self.declare_parameter('rejoin_max_ang', 0.18)
+        self.declare_parameter('line_rejoin_error_thresh', 75.0)
+        self.declare_parameter('line_rejoin_confirm_frames', 5)
         self.declare_parameter('publish_rate_hz', 20.0)
 
-        # Get parameters
         self.front_half_angle = math.radians(float(self.get_parameter('front_half_angle_deg').value))
+        self.side_sector_min = math.radians(float(self.get_parameter('side_sector_min_deg').value))
         self.side_sector_max = math.radians(float(self.get_parameter('side_sector_max_deg').value))
-        self.lidar_to_hull_margin = float(self.get_parameter('lidar_to_hull_margin').value)
         self.avoid_distance = float(self.get_parameter('avoid_distance').value)
+        self.clear_distance = float(self.get_parameter('clear_distance').value)
+        self.forward_front_min = float(self.get_parameter('forward_front_min').value)
         self.emergency_distance = float(self.get_parameter('emergency_distance').value)
-        self.stop_time = float(self.get_parameter('stop_time_sec').value)
-        self.back_off_speed = float(self.get_parameter('back_off_speed').value)
-        self.turn_direction_hysteresis = float(self.get_parameter('turn_direction_hysteresis_m').value)
-        self.turn_speed = float(self.get_parameter('turn_speed').value)
-        self.turn_time = float(self.get_parameter('turn_time_sec').value)
-        self.turn_time_cap = self.turn_time * 1.6
-        self.intended_turn_angle = self.turn_speed * self.turn_time
-        self.forward_speed = float(self.get_parameter('forward_speed').value)
-        self.forward_distance = float(self.get_parameter('forward_distance_m').value)
-        self.forward_time = float(self.get_parameter('forward_time_sec').value)
-        self.yaw_tolerance = math.radians(float(self.get_parameter('yaw_tolerance_deg').value))
-        self.search_turn_speed = float(self.get_parameter('search_turn_speed').value)
-        self.line_search_error_threshold = float(self.get_parameter('line_search_error_threshold').value)
-        self.line_search_confirm_count = int(self.get_parameter('line_search_confirm_count').value)
-        self.search_max_yaw_deviation = math.radians(float(self.get_parameter('search_max_yaw_deviation_deg').value))
-        self.search_timeout = float(self.get_parameter('search_timeout_sec').value)
+        self.side_clear_distance = float(self.get_parameter('side_clear_distance').value)
+        self.side_emergency_distance = float(self.get_parameter('side_emergency_distance').value)
+        self.clear_confirm_frames = max(1, int(self.get_parameter('clear_confirm_frames').value))
+        self.turn_time = max(0.1, float(self.get_parameter('turn_time_sec').value))
+        self.forward_time = max(0.1, float(self.get_parameter('forward_time_sec').value))
+        self.turn_speed = abs(float(self.get_parameter('turn_speed').value))
+        self.emergency_turn_speed = abs(float(self.get_parameter('emergency_turn_speed').value))
+        self.forward_speed = max(0.0, float(self.get_parameter('forward_speed').value))
+        self.rejoin_speed = max(0.0, float(self.get_parameter('rejoin_speed').value))
+        self.search_rejoin_speed = max(0.0, float(self.get_parameter('search_rejoin_speed').value))
+        self.search_rejoin_turn_speed = abs(float(self.get_parameter('search_rejoin_turn_speed').value))
+        self.rejoin_kp = float(self.get_parameter('rejoin_kp').value)
+        self.rejoin_max_ang = abs(float(self.get_parameter('rejoin_max_ang').value))
+        self.line_rejoin_error_thresh = float(self.get_parameter('line_rejoin_error_thresh').value)
+        self.line_rejoin_confirm_frames = max(1, int(self.get_parameter('line_rejoin_confirm_frames').value))
         publish_rate = max(1.0, float(self.get_parameter('publish_rate_hz').value))
 
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel_obstacle', 10)
-        self.scan_sub = self.create_subscription(LaserScan, '/scan', self.on_scan, 10)
-        self.odom_sub = self.create_subscription(Odometry, '/odom', self.on_odom, 10)
-        self.line_error_sub = self.create_subscription(Float32, '/line_error', self.on_line_error, 10)
+        self.create_subscription(LaserScan, '/scan', self.on_scan, 10)
+        self.create_subscription(Float32, '/line_error', self.on_line_error, 10)
         self.timer = self.create_timer(1.0 / publish_rate, self.on_timer)
 
         self.last_scan = None
         self.line_error = None
-        self.line_seen_count = 0
         self.state = self.IDLE
-        self.state_until = self.get_clock().now()
+        self.state_started_at = self.get_clock().now()
+        self.state_until = self.state_started_at
         self.turn_dir = 1.0
-        self.current_yaw = None
-        self.target_yaw = None
-        self.current_x = None
-        self.current_y = None
-        self.forward_start_x = None
-        self.forward_start_y = None
-        self.turn_start_yaw = None
-        self.search_start_yaw = None
-        self.search_dir = 1.0
-        self.search_entered_time = None
+        self.clear_count = 0
+        self.line_rejoin_count = 0
+        self.last_motion_log_time = None
+        self.turn_timeout_warned = False
 
         self.get_logger().info(
-            f'ObstacleAvoid: avoid={self.avoid_distance:.2f}m, '
-            f'emergency={self.emergency_distance:.2f}m, '
-            f'turn={self.turn_time:.2f}s, forward={self.forward_distance:.2f}m'
+            'ObstacleAvoid simplified with side clearance: '
+            f'avoid={self.avoid_distance:.2f} clear={self.clear_distance:.2f} '
+            f'forward_front_min={self.forward_front_min:.2f} side_clear={self.side_clear_distance:.2f}'
         )
 
     def on_scan(self, msg: LaserScan):
         self.last_scan = msg
-
-    def on_odom(self, msg: Odometry):
-        q = msg.pose.pose.orientation
-        self.current_yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
-        self.current_x = msg.pose.pose.position.x
-        self.current_y = msg.pose.pose.position.y
 
     def on_line_error(self, msg: Float32):
         if math.isfinite(msg.data) and msg.data != -1.0:
@@ -132,138 +128,168 @@ class ObstacleAvoid(Node):
         else:
             self.line_error = None
 
-    @staticmethod
-    def normalize_angle(angle):
-        return math.atan2(math.sin(angle), math.cos(angle))
-
-    def in_sector(self, angle, start, end):
-        return angle_in_sector(angle, start, end)
-
     def scan_distances(self):
-        scan = self.last_scan
-        front = sector_min(scan.ranges, scan.angle_min, scan.angle_increment, -self.front_half_angle, self.front_half_angle)
-        left = sector_min(scan.ranges, scan.angle_min, scan.angle_increment, self.front_half_angle, self.side_sector_max)
-        right = sector_min(scan.ranges, scan.angle_min, scan.angle_increment, -self.side_sector_max, -self.front_half_angle)
-        return (front - self.lidar_to_hull_margin, left - self.lidar_to_hull_margin, right - self.lidar_to_hull_margin)
+        front = sector_min(
+            self.last_scan.ranges,
+            self.last_scan.angle_min,
+            self.last_scan.angle_increment,
+            -self.front_half_angle,
+            self.front_half_angle,
+        )
+        left = sector_min(
+            self.last_scan.ranges,
+            self.last_scan.angle_min,
+            self.last_scan.angle_increment,
+            self.side_sector_min,
+            self.side_sector_max,
+        )
+        right = sector_min(
+            self.last_scan.ranges,
+            self.last_scan.angle_min,
+            self.last_scan.angle_increment,
+            -self.side_sector_max,
+            -self.side_sector_min,
+        )
+        return front, left, right
 
-    def publish_cmd(self, linear_x: float, angular_z: float):
+    def state_name(self):
+        return self.STATE_NAMES.get(self.state, 'UNKNOWN')
+
+    def direction_name(self):
+        return 'LEFT' if self.turn_dir > 0.0 else 'RIGHT'
+
+    def search_direction_name(self):
+        return 'RIGHT' if self.turn_dir > 0.0 else 'LEFT'
+
+    def choose_turn_direction(self, left, right):
+        self.turn_dir = 1.0 if left >= right else -1.0
+
+    def obstacle_side_clearance(self, left, right):
+        return right if self.turn_dir > 0.0 else left
+
+    def publish_cmd(self, linear_x, angular_z, front, left, right, obstacle_side):
         msg = Twist()
-        msg.linear.x = float(linear_x)
+        msg.linear.x = max(0.0, float(linear_x))
         msg.angular.z = float(angular_z)
         self.cmd_pub.publish(msg)
+        self.log_motion(front, left, right, obstacle_side, msg.linear.x, msg.angular.z)
 
-    def enter_state(self, state: int, duration_sec: float = 0.0):
+    def log_motion(self, front, left, right, obstacle_side, linear_x, angular_z):
+        now = self.get_clock().now()
+        if self.last_motion_log_time is not None:
+            dt = (now - self.last_motion_log_time).nanoseconds * 1e-9
+            if dt < 0.20:
+                return
+        self.last_motion_log_time = now
+        self.get_logger().info(
+            f'state={self.state_name()} front_min={front:.2f} left_clearance={left:.2f} '
+            f'right_clearance={right:.2f} obstacle_side_clearance={obstacle_side:.2f} '
+            f'chosen_direction={self.direction_name()} line_error={self.line_error} '
+            f'linear.x={linear_x:.3f} angular.z={angular_z:.3f}'
+        )
+
+    def enter_state(self, state, duration_sec=0.0, reason=''):
+        now = self.get_clock().now()
         self.state = state
-        self.state_until = self.get_clock().now() + Duration(seconds=duration_sec)
-        if state == self.SEARCH_LINE:
-            self.search_start_yaw = self.current_yaw
-            self.search_dir = -self.turn_dir if self.turn_dir != 0.0 else 1.0
-            self.search_entered_time = self.get_clock().now()
+        self.state_started_at = now
+        self.state_until = now + Duration(seconds=max(0.0, duration_sec))
+        if state == self.TURN_AWAY:
+            self.clear_count = 0
+            self.turn_timeout_warned = False
+        if state == self.REJOIN_LINE:
+            self.line_rejoin_count = 0
+        if state == self.IDLE:
+            self.line_rejoin_count = 0
+            self.clear_count = 0
+            self.turn_timeout_warned = False
+        msg = f'state_change={self.state_name()} chosen_direction={self.direction_name()}'
+        if reason:
+            msg += f' transition_reason={reason}'
+        self.get_logger().info(msg)
 
-    def has_line(self) -> bool:
-        return self.line_error is not None and abs(self.line_error) <= self.line_search_error_threshold
-
-    def distance_travelled(self) -> float:
-        if self.current_x is None or self.forward_start_x is None:
-            return 0.0
-        return math.hypot(self.current_x - self.forward_start_x, self.current_y - self.forward_start_y)
-
-    def select_turn_direction(self, left: float, right: float):
-        if left >= right + self.turn_direction_hysteresis:
-            self.turn_dir = 1.0
-        elif right >= left + self.turn_direction_hysteresis:
-            self.turn_dir = -1.0
+    def line_centered(self):
+        return self.line_error is not None and abs(self.line_error) < self.line_rejoin_error_thresh
 
     def on_timer(self):
         if self.last_scan is None:
             return
+
         now = self.get_clock().now()
         front, left, right = self.scan_distances()
 
         if self.state == self.IDLE:
-            self.publish_cmd(0.0, 0.0)
             if front < self.avoid_distance:
-                self.target_yaw = self.current_yaw
-                self.select_turn_direction(left, right)
-                self.get_logger().warn(f'OBSTACLE front={front:.2f} left={left:.2f} right={right:.2f}')
-                self.enter_state(self.STOP, self.stop_time)
+                self.choose_turn_direction(left, right)
+                obstacle_side = self.obstacle_side_clearance(left, right)
+                self.get_logger().warn(
+                    f'OBSTACLE_DETECTED front_min={front:.2f} left_clearance={left:.2f} '
+                    f'right_clearance={right:.2f} obstacle_side_clearance={obstacle_side:.2f} '
+                    f'chosen_direction={self.direction_name()}'
+                )
+                self.enter_state(self.TURN_AWAY, self.turn_time, 'initial_turn')
             return
 
-        if self.state == self.STOP:
-            self.publish_cmd(-self.back_off_speed, 0.0)
+        obstacle_side = self.obstacle_side_clearance(left, right)
+        emergency = front < self.emergency_distance or obstacle_side < self.side_emergency_distance
+
+        if self.state == self.TURN_AWAY:
+            angular = self.emergency_turn_speed if emergency else self.turn_speed
+            self.publish_cmd(0.0, self.turn_dir * angular, front, left, right, obstacle_side)
+            if front > self.clear_distance and obstacle_side > self.side_clear_distance:
+                self.clear_count += 1
+            else:
+                self.clear_count = 0
+
+            if self.clear_count >= self.clear_confirm_frames:
+                self.enter_state(self.FORWARD_AROUND, self.forward_time, 'front_and_side_clear_confirmed')
+                return
+
+            if now >= self.state_until and not self.turn_timeout_warned:
+                self.turn_timeout_warned = True
+                self.get_logger().warn(
+                    f'TURN_AWAY timeout diagnostic: front_min={front:.2f} '
+                    f'obstacle_side_clearance={obstacle_side:.2f}; continuing turn'
+                )
+            return
+
+        if self.state == self.FORWARD_AROUND:
+            if emergency:
+                self.publish_cmd(0.0, self.turn_dir * self.emergency_turn_speed, front, left, right, obstacle_side)
+                self.enter_state(self.TURN_AWAY, self.turn_time, 'emergency_during_forward')
+                return
+
+            if front <= self.forward_front_min or obstacle_side <= self.side_clear_distance:
+                self.publish_cmd(0.0, self.turn_dir * self.turn_speed, front, left, right, obstacle_side)
+                self.enter_state(self.TURN_AWAY, self.turn_time, 'front_or_side_not_clear_for_forward')
+                return
+
+            self.publish_cmd(self.forward_speed, 0.0, front, left, right, obstacle_side)
             if now >= self.state_until:
-                self.turn_start_yaw = self.current_yaw
-                self.enter_state(self.TURN, self.turn_time_cap)
+                self.enter_state(self.REJOIN_LINE, reason='forward_complete')
             return
 
-        if self.state == self.TURN:
-            if min(front, left, right) < self.emergency_distance:
-                self.select_turn_direction(left, right)
-                self.get_logger().warn(f'EMERGENCY during turn front={front:.2f}')
-                self.enter_state(self.STOP, self.stop_time)
+        if self.state == self.REJOIN_LINE:
+            if emergency:
+                self.publish_cmd(0.0, self.turn_dir * self.emergency_turn_speed, front, left, right, obstacle_side)
+                self.enter_state(self.TURN_AWAY, self.turn_time, 'emergency_during_rejoin')
                 return
-            self.publish_cmd(0.0, self.turn_dir * self.turn_speed)
-            rotated_enough = (self.turn_start_yaw is not None and self.current_yaw is not None and
-                            abs(normalize_angle(self.current_yaw - self.turn_start_yaw)) >= self.intended_turn_angle)
-            if rotated_enough or now >= self.state_until:
-                self.forward_start_x = self.current_x
-                self.forward_start_y = self.current_y
-                self.enter_state(self.FORWARD, self.forward_time)
-            return
 
-        if self.state == self.FORWARD:
-            if min(front, left, right) < self.emergency_distance:
-                self.select_turn_direction(left, right)
-                self.get_logger().warn(f'EMERGENCY forward front={front:.2f}')
-                self.enter_state(self.STOP, self.stop_time)
-                return
-            self.publish_cmd(self.forward_speed, 0.0)
-            if self.distance_travelled() >= self.forward_distance or now >= self.state_until:
-                self.enter_state(self.TURN_BACK)
-            return
+            if self.line_error is not None:
+                linear = self.rejoin_speed
+                angular = max(-self.rejoin_max_ang, min(self.rejoin_max_ang, -self.rejoin_kp * self.line_error))
+            else:
+                linear = self.search_rejoin_speed
+                angular = -self.turn_dir * self.search_rejoin_turn_speed
 
-        if self.state == self.TURN_BACK:
-            if self.current_yaw is None or self.target_yaw is None:
-                self.enter_state(self.SEARCH_LINE)
-                return
-            yaw_error = normalize_angle(self.target_yaw - self.current_yaw)
-            if abs(yaw_error) <= self.yaw_tolerance:
-                self.enter_state(self.SEARCH_LINE)
-                return
-            self.publish_cmd(0.0, math.copysign(self.turn_speed, yaw_error))
-            return
+            self.publish_cmd(linear, angular, front, left, right, obstacle_side)
 
-        if self.state == self.SEARCH_LINE:
-            if self.has_line():
-                self.line_seen_count += 1
-                if self.line_seen_count >= self.line_search_confirm_count:
-                    self.get_logger().info('LINE reacquired')
-                    self.line_seen_count = 0
-                    self.enter_state(self.IDLE)
+            if self.line_centered():
+                self.line_rejoin_count += 1
+                if self.line_rejoin_count >= self.line_rejoin_confirm_frames:
+                    self.enter_state(self.IDLE, reason='line_centered_confirmed')
                     return
             else:
-                self.line_seen_count = 0
-
-            if self.search_entered_time is not None:
-                searched_for = (now - self.search_entered_time).nanoseconds / 1e9
-                if searched_for >= self.search_timeout:
-                    self.get_logger().warn(f'SEARCH timeout after {searched_for:.1f}s')
-                    self.line_seen_count = 0
-                    self.enter_state(self.IDLE)
-                    return
-
-            yaw_dev = 0.0
-            if self.current_yaw is not None and self.search_start_yaw is not None:
-                yaw_dev = normalize_angle(self.current_yaw - self.search_start_yaw)
-
-            if yaw_dev >= self.search_max_yaw_deviation:
-                self.search_dir = -1.0
-            elif yaw_dev <= -self.search_max_yaw_deviation:
-                self.search_dir = 1.0
-            elif self.line_error is not None:
-                self.search_dir = -math.copysign(1.0, self.line_error)
-
-            self.publish_cmd(0.0, self.search_dir * self.search_turn_speed)
+                self.line_rejoin_count = 0
 
 
 def main(args=None):

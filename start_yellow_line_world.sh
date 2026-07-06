@@ -27,12 +27,6 @@ sleep 5
 ros2 launch turtlebot3_gazebo robot_state_publisher.launch.py use_sim_time:=true &
 RSP_PID=$!
 
-ros2 run gazebo_ros spawn_entity.py \
-  -entity turtlebot3_waffle_pi \
-  -file "${ROBOT_MODEL}" \
-  -x "${ROBOT_START_X}" \
-  -y "${ROBOT_START_Y}" \
-  -z 0.01 \
-  -Y "${ROBOT_START_YAW}"
+ros2 run gazebo_ros spawn_entity.py   -entity turtlebot3_waffle_pi   -file "${ROBOT_MODEL}"   -x "${ROBOT_START_X}"   -y "${ROBOT_START_Y}"   -z 0.01   -Y "${ROBOT_START_YAW}"
 
 wait "${GZSERVER_PID}" "${GZCLIENT_PID}" "${RSP_PID}"
