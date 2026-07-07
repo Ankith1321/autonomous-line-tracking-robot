@@ -227,7 +227,17 @@ class LineDetector(Node):
             if self._filtered_error is None:
                 self._filtered_error = raw_error
             else:
-                alpha = max(0.0, min(1.0, self._ema_alpha))
+                error_diff = abs(raw_error - self._filtered_error)
+                low_diff = 20.0
+                high_diff = 60.0
+                base_alpha = max(0.0, min(1.0, self._ema_alpha))
+                if error_diff <= low_diff:
+                    alpha = base_alpha
+                elif error_diff >= high_diff:
+                    alpha = 1.0
+                else:
+                    ratio = (error_diff - low_diff) / (high_diff - low_diff)
+                    alpha = base_alpha + ratio * (1.0 - base_alpha)
                 self._filtered_error = alpha * raw_error + (1.0 - alpha) * self._filtered_error
             self._last_error = self._filtered_error
 

@@ -32,9 +32,12 @@
       </link>
     </model>
 
+    <!-- CLOSED SQUARE YELLOW TRACK (5.0m x 5.0m) -->
+
+    <!-- Side 1: Bottom Horizontal Line (X from 0 to 5, Y = 0) -->
     <model name="yellow_line_horizontal">
       <static>true</static>
-      <pose>2.50 0.0 0.012 0 0 0</pose>
+      <pose>2.50 0.00 0.012 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry>
@@ -51,14 +54,15 @@
       </link>
     </model>
 
+    <!-- Side 2: Right Vertical Line (X = 5, Y from 0 to 5) -->
     <model name="yellow_line_vertical">
       <static>true</static>
-      <pose>5.0 1.50 0.012 0 0 0</pose>
+      <pose>5.00 2.50 0.012 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry>
             <box>
-              <size>0.18 3.00 0.014</size>
+              <size>0.18 5.00 0.014</size>
             </box>
           </geometry>
           <material>
@@ -70,9 +74,52 @@
       </link>
     </model>
 
+    <!-- Side 3: Top Horizontal Line (X from 0 to 5, Y = 5) -->
+    <model name="yellow_line_top">
+      <static>true</static>
+      <pose>2.50 5.00 0.012 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>5.00 0.18 0.014</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.92 0.74 0.05 1</ambient>
+            <diffuse>0.95 0.78 0.05 1</diffuse>
+            <specular>0.05 0.05 0.02 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Side 4: Left Vertical Line (X = 0, Y from 0 to 5) -->
+    <model name="yellow_line_left">
+      <static>true</static>
+      <pose>0.00 2.50 0.012 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.18 5.00 0.014</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.92 0.74 0.05 1</ambient>
+            <diffuse>0.95 0.78 0.05 1</diffuse>
+            <specular>0.05 0.05 0.02 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- CENTERED STATIC OBSTACLES -->
+
+    <!-- Obstacle 1: Centered on Side 1 -->
     <model name="obstacle_one">
       <static>true</static>
-      <pose>2.20 0.20 0.16 0 0 0</pose>
+      <pose>2.50 0.00 0.16 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
@@ -96,21 +143,49 @@
       </link>
     </model>
 
+    <!-- Obstacle 2: Centered on Side 2 -->
     <model name="obstacle_two">
       <static>true</static>
-      <pose>4.88 1.70 0.16 0 0 0</pose>
+      <pose>5.00 2.50 0.16 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
             <box>
-              <size>0.22 0.22 0.32</size>
+              <size>0.24 0.24 0.32</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>0.22 0.22 0.32</size>
+              <size>0.24 0.24 0.32</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.85 0.85 0.86 1</ambient>
+            <diffuse>0.90 0.90 0.91 1</diffuse>
+            <specular>0.12 0.12 0.12 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Obstacle 3: Centered on Side 3 -->
+    <model name="obstacle_three">
+      <static>true</static>
+      <pose>2.50 5.00 0.16 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.24 0.24 0.32</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.24 0.24 0.32</size>
             </box>
           </geometry>
           <material>

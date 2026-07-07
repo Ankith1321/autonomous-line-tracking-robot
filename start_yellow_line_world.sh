@@ -4,6 +4,7 @@ set -e
 source /opt/ros/humble/setup.bash
 source /ws/install/setup.bash
 export TURTLEBOT3_MODEL=waffle_pi
+export LIBGL_ALWAYS_SOFTWARE=1
 
 WORLD_FILE=/ws/worlds/yellow_line_obstacle_demo.world
 ROBOT_MODEL=/opt/ros/humble/share/turtlebot3_gazebo/models/turtlebot3_waffle_pi/model.sdf

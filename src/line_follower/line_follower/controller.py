@@ -2,7 +2,7 @@
 import math
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Int32
 from geometry_msgs.msg import Twist
 
 
@@ -10,14 +10,14 @@ class LineController(Node):
     def __init__(self):
         super().__init__('line_controller')
 
-        self.declare_parameter('linear_x', 0.15)
+        self.declare_parameter('linear_x', 0.10)
         self.declare_parameter('min_linear_x', 0.08)
         self.declare_parameter('k_p', 0.0040)
-        self.declare_parameter('max_ang_z', 0.18)
+        self.declare_parameter('max_ang_z', 0.30)
         self.declare_parameter('steer_sign', -1.0)
         self.declare_parameter('lost_sentinel', -1000.0)
-        self.declare_parameter('search_w', 0.07)
-        self.declare_parameter('search_linear_x', 0.03)
+        self.declare_parameter('search_w', 0.25)
+        self.declare_parameter('search_linear_x', 0.08)
         self.declare_parameter('slowdown_error', 80.0)
         self.declare_parameter('turn_in_place_error', 240.0)
         self.declare_parameter('error_deadband', 10.0)
@@ -40,6 +40,9 @@ class LineController(Node):
 
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel_raw', 10)
         self.err_sub = self.create_subscription(Float32, '/line_error', self.on_error, 10)
+        self.safety_sub = self.create_subscription(Int32, '/safety_state', self.on_safety_state, 10)
+        self.cmd_sub = self.create_subscription(Twist, '/cmd_vel', self.on_cmd_vel, 10)
+        self.safety_state = 0  # Default to IDLE
         self.last_turn_sign = 1.0
         self.last_angular_z = 0.0
         self.lost_since = None
@@ -54,9 +57,28 @@ class LineController(Node):
     def clamp(value: float, low: float, high: float) -> float:
         return max(low, min(high, value))
 
+    def on_safety_state(self, msg: Int32) -> None:
+        prev_state = self.safety_state
+        self.safety_state = msg.data
+        if self.safety_state != 0:
+            self.lost_since = None
+            self.stopped_after_timeout = False
+        elif prev_state != 0:
+            self.lost_since = None
+            self.stopped_after_timeout = False
+            self.last_angular_z = 0.0
+
+    def on_cmd_vel(self, msg: Twist) -> None:
+        if abs(msg.angular.z) > 0.01:
+            self.last_turn_sign = 1.0 if msg.angular.z > 0.0 else -1.0
+
     def on_error(self, msg: Float32) -> None:
         err = float(msg.data)
         cmd = Twist()
+
+        if self.safety_state != 0:
+            self.lost_since = None
+            self.stopped_after_timeout = False
 
         if not math.isfinite(err) or err == self.lost_sentinel or err == -1.0:
             now = self.get_clock().now()

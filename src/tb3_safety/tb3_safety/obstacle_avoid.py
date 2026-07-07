@@ -6,7 +6,7 @@ from geometry_msgs.msg import Twist
 from rclpy.duration import Duration
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Int32
 
 
 def normalize_angle(angle):
@@ -52,23 +52,23 @@ class ObstacleAvoid(Node):
         self.declare_parameter('front_half_angle_deg', 28.0)
         self.declare_parameter('side_sector_min_deg', 30.0)
         self.declare_parameter('side_sector_max_deg', 120.0)
-        self.declare_parameter('avoid_distance', 0.95)
-        self.declare_parameter('clear_distance', 1.10)
-        self.declare_parameter('forward_front_min', 0.85)
-        self.declare_parameter('emergency_distance', 0.45)
-        self.declare_parameter('side_clear_distance', 0.45)
-        self.declare_parameter('side_emergency_distance', 0.28)
-        self.declare_parameter('clear_confirm_frames', 3)
-        self.declare_parameter('turn_time_sec', 1.20)
-        self.declare_parameter('forward_time_sec', 1.50)
-        self.declare_parameter('turn_speed', 0.32)
-        self.declare_parameter('emergency_turn_speed', 0.42)
-        self.declare_parameter('forward_speed', 0.035)
-        self.declare_parameter('rejoin_speed', 0.030)
-        self.declare_parameter('search_rejoin_speed', 0.020)
-        self.declare_parameter('search_rejoin_turn_speed', 0.07)
+        self.declare_parameter('avoid_distance', 0.90)
+        self.declare_parameter('clear_distance', 1.05)
+        self.declare_parameter('forward_front_min', 0.75)
+        self.declare_parameter('emergency_distance', 0.40)
+        self.declare_parameter('side_clear_distance', 0.38)
+        self.declare_parameter('side_emergency_distance', 0.25)
+        self.declare_parameter('clear_confirm_frames', 8)
+        self.declare_parameter('turn_time_sec', 1.80)
+        self.declare_parameter('forward_time_sec', 3.50)
+        self.declare_parameter('turn_speed', 0.45)
+        self.declare_parameter('emergency_turn_speed', 0.55)
+        self.declare_parameter('forward_speed', 0.10)
+        self.declare_parameter('rejoin_speed', 0.09)
+        self.declare_parameter('search_rejoin_speed', 0.08)
+        self.declare_parameter('search_rejoin_turn_speed', 0.35)
         self.declare_parameter('rejoin_kp', 0.0025)
-        self.declare_parameter('rejoin_max_ang', 0.18)
+        self.declare_parameter('rejoin_max_ang', 0.35)
         self.declare_parameter('line_rejoin_error_thresh', 75.0)
         self.declare_parameter('line_rejoin_confirm_frames', 5)
         self.declare_parameter('publish_rate_hz', 20.0)
@@ -96,11 +96,13 @@ class ObstacleAvoid(Node):
         self.line_rejoin_error_thresh = float(self.get_parameter('line_rejoin_error_thresh').value)
         self.line_rejoin_confirm_frames = max(1, int(self.get_parameter('line_rejoin_confirm_frames').value))
         publish_rate = max(1.0, float(self.get_parameter('publish_rate_hz').value))
+        self.dt = 1.0 / publish_rate
 
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel_obstacle', 10)
+        self.state_pub = self.create_publisher(Int32, '/safety_state', 10)
         self.create_subscription(LaserScan, '/scan', self.on_scan, 10)
         self.create_subscription(Float32, '/line_error', self.on_line_error, 10)
-        self.timer = self.create_timer(1.0 / publish_rate, self.on_timer)
+        self.timer = self.create_timer(self.dt, self.on_timer)
 
         self.last_scan = None
         self.line_error = None
@@ -112,6 +114,12 @@ class ObstacleAvoid(Node):
         self.line_rejoin_count = 0
         self.last_motion_log_time = None
         self.turn_timeout_warned = False
+        
+        # Multi-phase bypass variables
+        self.angle_turned = 0.0
+        self.forward_phase = 1
+        self.phase_until = self.state_started_at
+        self.phase_min_until = self.state_started_at
 
         self.get_logger().info(
             'ObstacleAvoid simplified with side clearance: '
@@ -161,8 +169,22 @@ class ObstacleAvoid(Node):
     def search_direction_name(self):
         return 'RIGHT' if self.turn_dir > 0.0 else 'LEFT'
 
-    def choose_turn_direction(self, left, right):
-        self.turn_dir = 1.0 if left >= right else -1.0
+    def choose_turn_direction(self, ranges, angle_min, angle_inc):
+        # Calculate min distance in left-front sector (0 to 60 deg) and right-front sector (-60 to 0 deg)
+        left_front = sector_min(ranges, angle_min, angle_inc, 0.0, math.radians(60.0))
+        right_front = sector_min(ranges, angle_min, angle_inc, math.radians(-60.0), 0.0)
+
+        # If left front has more clearance (larger minimum distance), turn left (obstacle is on right).
+        # Otherwise, turn right (obstacle is on left).
+        if left_front >= right_front:
+            self.turn_dir = 1.0  # Turn left
+        else:
+            self.turn_dir = -1.0 # Turn right
+
+        self.get_logger().info(
+            f'choose_turn_direction: left_front_clearance={left_front:.2f} '
+            f'right_front_clearance={right_front:.2f} -> chosen_direction={self.direction_name()}'
+        )
 
     def obstacle_side_clearance(self, left, right):
         return right if self.turn_dir > 0.0 else left
@@ -193,19 +215,27 @@ class ObstacleAvoid(Node):
         self.state = state
         self.state_started_at = now
         self.state_until = now + Duration(seconds=max(0.0, duration_sec))
+        
+        # Reset FSM variables cleanly on transitions to keep a clean slate
+        self.clear_count = 0
+        self.line_rejoin_count = 0
+        self.turn_timeout_warned = False
+        self.line_error = None
+        self.last_motion_log_time = None
+        
         if state == self.TURN_AWAY:
-            self.clear_count = 0
-            self.turn_timeout_warned = False
-        if state == self.REJOIN_LINE:
-            self.line_rejoin_count = 0
-        if state == self.IDLE:
-            self.line_rejoin_count = 0
-            self.clear_count = 0
-            self.turn_timeout_warned = False
+            self.angle_turned = 0.0
+
+        if state == self.FORWARD_AROUND:
+            self.forward_phase = 1
+            self.phase_until = now + Duration(seconds=4.00)
+            self.get_logger().info('FORWARD_AROUND: starting Phase 1 (shift out for 4.00s)')
+            
         msg = f'state_change={self.state_name()} chosen_direction={self.direction_name()}'
         if reason:
             msg += f' transition_reason={reason}'
         self.get_logger().info(msg)
+        self.state_pub.publish(Int32(data=int(self.state)))
 
     def line_centered(self):
         return self.line_error is not None and abs(self.line_error) < self.line_rejoin_error_thresh
@@ -214,12 +244,25 @@ class ObstacleAvoid(Node):
         if self.last_scan is None:
             return
 
+        # Periodically publish state to prevent race conditions
+        self.state_pub.publish(Int32(data=int(self.state)))
+
         now = self.get_clock().now()
         front, left, right = self.scan_distances()
 
+        # Path-blocked check using a narrower front sector (+/- 12 degrees)
+        # to prevent false triggers from side obstacles we are actively bypassing.
+        path_front = sector_min(
+            self.last_scan.ranges,
+            self.last_scan.angle_min,
+            self.last_scan.angle_increment,
+            -math.radians(12.0),
+            math.radians(12.0),
+        )
+
         if self.state == self.IDLE:
             if front < self.avoid_distance:
-                self.choose_turn_direction(left, right)
+                self.choose_turn_direction(self.last_scan.ranges, self.last_scan.angle_min, self.last_scan.angle_increment)
                 obstacle_side = self.obstacle_side_clearance(left, right)
                 self.get_logger().warn(
                     f'OBSTACLE_DETECTED front_min={front:.2f} left_clearance={left:.2f} '
@@ -235,7 +278,9 @@ class ObstacleAvoid(Node):
         if self.state == self.TURN_AWAY:
             angular = self.emergency_turn_speed if emergency else self.turn_speed
             self.publish_cmd(0.0, self.turn_dir * angular, front, left, right, obstacle_side)
-            if front > self.clear_distance and obstacle_side > self.side_clear_distance:
+            self.angle_turned += angular * self.dt
+
+            if front > self.clear_distance and obstacle_side > self.side_emergency_distance and self.angle_turned >= math.radians(45.0):
                 self.clear_count += 1
             else:
                 self.clear_count = 0
@@ -244,12 +289,15 @@ class ObstacleAvoid(Node):
                 self.enter_state(self.FORWARD_AROUND, self.forward_time, 'front_and_side_clear_confirmed')
                 return
 
-            if now >= self.state_until and not self.turn_timeout_warned:
-                self.turn_timeout_warned = True
-                self.get_logger().warn(
-                    f'TURN_AWAY timeout diagnostic: front_min={front:.2f} '
-                    f'obstacle_side_clearance={obstacle_side:.2f}; continuing turn'
-                )
+            if now >= self.state_until:
+                if front > self.clear_distance and self.angle_turned >= math.radians(45.0):
+                    self.enter_state(self.FORWARD_AROUND, self.forward_time, 'turn_timeout_front_clear_fallback')
+                    return
+                elif not self.turn_timeout_warned:
+                    self.turn_timeout_warned = True
+                    self.get_logger().warn(
+                        f'TURN_AWAY timeout reached but front still blocked (front={front:.2f}) or min turn angle not reached (angle={self.angle_turned*180.0/math.pi:.1f} deg). Continuing turn.'
+                    )
             return
 
         if self.state == self.FORWARD_AROUND:
@@ -258,15 +306,48 @@ class ObstacleAvoid(Node):
                 self.enter_state(self.TURN_AWAY, self.turn_time, 'emergency_during_forward')
                 return
 
-            if front <= self.forward_front_min or obstacle_side <= self.side_clear_distance:
-                self.publish_cmd(0.0, self.turn_dir * self.turn_speed, front, left, right, obstacle_side)
-                self.enter_state(self.TURN_AWAY, self.turn_time, 'front_or_side_not_clear_for_forward')
+            if self.forward_phase == 1:
+                # Phase 1: Shift out (drive straight at angle)
+                if path_front <= self.forward_front_min:
+                    self.publish_cmd(0.0, self.turn_dir * self.turn_speed, front, left, right, obstacle_side)
+                    self.enter_state(self.TURN_AWAY, self.turn_time, 'front_blocked_during_shift_out')
+                    return
+                
+                self.publish_cmd(self.forward_speed, 0.0, front, left, right, obstacle_side)
+                if now >= self.phase_until:
+                    self.forward_phase = 2
+                    deg = self.angle_turned * 180.0 / math.pi
+                    self.get_logger().info(f'FORWARD_AROUND: transitioning to Phase 2 (turn parallel, angle to correct = {deg:.1f} deg)')
                 return
 
-            self.publish_cmd(self.forward_speed, 0.0, front, left, right, obstacle_side)
-            if now >= self.state_until:
-                self.enter_state(self.REJOIN_LINE, reason='forward_complete')
-            return
+            elif self.forward_phase == 2:
+                # Phase 2: Turn parallel (turn opposite to turn_dir)
+                angular_z = -self.turn_dir * self.turn_speed
+                self.publish_cmd(0.0, angular_z, front, left, right, obstacle_side)
+                self.angle_turned -= self.turn_speed * self.dt
+                if self.angle_turned <= 0.0:
+                    self.forward_phase = 3
+                    self.phase_until = now + Duration(seconds=9.00)
+                    self.phase_min_until = now + Duration(seconds=3.00)
+                    self.get_logger().info('FORWARD_AROUND: transitioning to Phase 3 (drive past)')
+                return
+
+            elif self.forward_phase == 3:
+                # Phase 3: Drive parallel to the line to clear the obstacle
+                if path_front <= self.forward_front_min:
+                    self.publish_cmd(0.0, self.turn_dir * self.turn_speed, front, left, right, obstacle_side)
+                    self.enter_state(self.TURN_AWAY, self.turn_time, 'front_blocked_during_drive_past')
+                    return
+                
+                self.publish_cmd(self.forward_speed, 0.0, front, left, right, obstacle_side)
+                
+                if now >= self.phase_min_until and obstacle_side > 0.85:
+                    self.enter_state(self.REJOIN_LINE, reason='obstacle_side_cleared_dynamic')
+                    return
+                
+                if now >= self.phase_until:
+                    self.enter_state(self.REJOIN_LINE, reason='forward_timeout')
+                return
 
         if self.state == self.REJOIN_LINE:
             if emergency:
@@ -274,22 +355,33 @@ class ObstacleAvoid(Node):
                 self.enter_state(self.TURN_AWAY, self.turn_time, 'emergency_during_rejoin')
                 return
 
+            # If line is re-acquired, check if obstacle is physically cleared before transitioning to IDLE
             if self.line_error is not None:
-                linear = self.rejoin_speed
-                angular = max(-self.rejoin_max_ang, min(self.rejoin_max_ang, -self.rejoin_kp * self.line_error))
-            else:
-                linear = self.search_rejoin_speed
-                angular = -self.turn_dir * self.search_rejoin_turn_speed
-
-            self.publish_cmd(linear, angular, front, left, right, obstacle_side)
-
-            if self.line_centered():
                 self.line_rejoin_count += 1
                 if self.line_rejoin_count >= self.line_rejoin_confirm_frames:
-                    self.enter_state(self.IDLE, reason='line_centered_confirmed')
+                    if front > self.avoid_distance and obstacle_side > self.side_clear_distance:
+                        self.publish_cmd(0.0, 0.0, front, left, right, obstacle_side)
+                        self.enter_state(self.IDLE, reason='line_reacquired_and_obstacle_cleared')
+                        return
+                    else:
+                        # Steer along the line using rejoin parameters but do not hand back control to autonomy yet
+                        linear = self.rejoin_speed
+                        angular = max(-self.rejoin_max_ang, min(self.rejoin_max_ang, -self.rejoin_kp * self.line_error))
+                        self.publish_cmd(linear, angular, front, left, right, obstacle_side)
+                        return
+                else:
+                    # Keep searching/sweeping towards the expected line direction while we confirm the line
+                    linear = self.search_rejoin_speed
+                    angular = -self.turn_dir * self.search_rejoin_turn_speed
+                    self.publish_cmd(linear, angular, front, left, right, obstacle_side)
                     return
             else:
                 self.line_rejoin_count = 0
+                # Keep searching/sweeping towards the expected line direction
+                linear = self.search_rejoin_speed
+                angular = -self.turn_dir * self.search_rejoin_turn_speed
+                self.publish_cmd(linear, angular, front, left, right, obstacle_side)
+                return
 
 
 def main(args=None):
