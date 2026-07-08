@@ -16,27 +16,31 @@ class LineDetector(Node):
     def __init__(self):
         super().__init__("line_detector")
 
-        self.declare_parameter("roi_start", 0.60)
-        self.declare_parameter("line_is_dark", True)
-        self.declare_parameter("use_adaptive", True)
-        self.declare_parameter("adaptive_block", 31)
-        self.declare_parameter("adaptive_c", 5)
-        self.declare_parameter("fixed_thresh", 140)
-        self.declare_parameter("use_hsv", True)
-        self.declare_parameter("hsv_lower_h", 15)
-        self.declare_parameter("hsv_lower_s", 80)
-        self.declare_parameter("hsv_lower_v", 80)
-        self.declare_parameter("hsv_upper_h", 40)
-        self.declare_parameter("hsv_upper_s", 255)
-        self.declare_parameter("hsv_upper_v", 255)
-        self.declare_parameter("kernel_size", 5)
-        self.declare_parameter("lost_sentinel", -1.0)
-        self.declare_parameter("min_nonzero", 50)
-        self.declare_parameter("max_fill_ratio", 0.60)
-        self.declare_parameter("min_contour_area", 250.0)
-        self.declare_parameter("ema_alpha", 0.25)
-        self.declare_parameter("max_contour_jump", 120.0)
-        self.declare_parameter("contour_switch_confirm_frames", 3)
+        params = {
+            "roi_start": 0.60,
+            "line_is_dark": True,
+            "use_adaptive": True,
+            "adaptive_block": 31,
+            "adaptive_c": 5,
+            "fixed_thresh": 140,
+            "use_hsv": True,
+            "hsv_lower_h": 15,
+            "hsv_lower_s": 80,
+            "hsv_lower_v": 80,
+            "hsv_upper_h": 40,
+            "hsv_upper_s": 255,
+            "hsv_upper_v": 255,
+            "kernel_size": 5,
+            "lost_sentinel": -1.0,
+            "min_nonzero": 50,
+            "max_fill_ratio": 0.60,
+            "min_contour_area": 250.0,
+            "ema_alpha": 0.25,
+            "max_contour_jump": 120.0,
+            "contour_switch_confirm_frames": 3
+        }
+        for name, default in params.items():
+            self.declare_parameter(name, default)
 
         self._roi_start = float(self.get_parameter("roi_start").value)
         self._line_is_dark = bool(self.get_parameter("line_is_dark").value)
@@ -45,6 +49,7 @@ class LineDetector(Node):
         self._adaptive_c = int(self.get_parameter("adaptive_c").value)
         self._fixed_thresh = int(self.get_parameter("fixed_thresh").value)
         self._use_hsv = bool(self.get_parameter("use_hsv").value)
+        
         self._hsv_lower = np.array([
             int(self.get_parameter("hsv_lower_h").value),
             int(self.get_parameter("hsv_lower_s").value),
@@ -55,6 +60,7 @@ class LineDetector(Node):
             int(self.get_parameter("hsv_upper_s").value),
             int(self.get_parameter("hsv_upper_v").value),
         ], dtype=np.uint8)
+        
         self._kernel_size = int(self.get_parameter("kernel_size").value)
         self._lost_sentinel = float(self.get_parameter("lost_sentinel").value)
         self._min_nonzero = int(self.get_parameter("min_nonzero").value)
@@ -82,9 +88,7 @@ class LineDetector(Node):
         self.nonzero_pub = self.create_publisher(Int32, "/line_mask_nonzero", 10)
 
         self.bridge = CvBridge()
-        self.get_logger().info(
-            "LineDetector started. Subscribed: /camera/image_raw, Publishing: /line_error, /line_mask, /line_mask_nonzero"
-        )
+        self.get_logger().info("Line detector initialized.")
 
         self._last_error = self._lost_sentinel
         self._last_nonzero = 0
@@ -198,8 +202,8 @@ class LineDetector(Node):
             mask_msg = self.bridge.cv2_to_imgmsg(mask, encoding="mono8")
             mask_msg.header = msg.header
             self.mask_pub.publish(mask_msg)
-        except Exception:
-            pass
+        except Exception as e:
+            self.get_logger().error(f"Failed to publish debug mask: {e}")
 
         nonzero = int(cv2.countNonZero(mask))
         self._last_nonzero = nonzero
@@ -259,15 +263,9 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        try:
-            node.destroy_node()
-        except Exception:
-            pass
-        try:
-            if rclpy.ok():
-                rclpy.shutdown()
-        except Exception:
-            pass
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

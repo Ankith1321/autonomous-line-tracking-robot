@@ -10,10 +10,14 @@ class CmdVelMux(Node):
     def __init__(self):
         super().__init__('cmd_vel_mux')
 
-        self.declare_parameter('obstacle_timeout_sec', 0.15)
-        self.declare_parameter('line_timeout_sec', 0.50)
-        self.declare_parameter('publish_hz', 20.0)
-        self.declare_parameter('debug', False)
+        params = {
+            'obstacle_timeout_sec': 0.15,
+            'line_timeout_sec': 0.50,
+            'publish_hz': 20.0,
+            'debug': False,
+        }
+        for name, default in params.items():
+            self.declare_parameter(name, default)
 
         self.obstacle_timeout = float(self.get_parameter('obstacle_timeout_sec').value)
         self.line_timeout = float(self.get_parameter('line_timeout_sec').value)
@@ -27,7 +31,7 @@ class CmdVelMux(Node):
         self.last_line_time = None
         self.last_obs_time = None
         self.last_source = None
-        self.safety_state = 0  # Default to IDLE (0)
+        self.safety_state = 0
         self.last_safety_state_time = None
 
         self.create_subscription(Twist, '/cmd_vel_raw', self.on_line, 10)
@@ -36,10 +40,7 @@ class CmdVelMux(Node):
         self.pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.timer = self.create_timer(self.period, self.tick)
 
-        self.get_logger().info(
-            f'cmd_vel_mux started | obstacle_timeout={self.obstacle_timeout:.2f}s '
-            f'line_timeout={self.line_timeout:.2f}s publish_hz={1.0 / self.period:.1f}'
-        )
+        self.get_logger().info('Mux initialized.')
 
     def on_line(self, msg: Twist):
         self.last_line = msg
@@ -60,13 +61,13 @@ class CmdVelMux(Node):
         return age_sec <= timeout_sec
 
     def tick(self):
-        # Time out safety_state if we haven't heard from obstacle_avoid for >0.5s to handle crash gracefully
+        # Reset safety state if safety node stops publishing
         if self.last_safety_state_time is not None:
             state_age = (self.get_clock().now() - self.last_safety_state_time).nanoseconds * 1e-9
             if state_age > 0.5:
                 self.safety_state = 0
 
-        # If safety state is IDLE (0), instantly bypass safety timeout and ignore obstacle commands
+        # Raw commands bypass safety checks when in IDLE
         obs_recent = self.is_recent(self.last_obs_time, self.obstacle_timeout) if self.safety_state != 0 else False
         line_recent = self.is_recent(self.last_line_time, self.line_timeout)
 

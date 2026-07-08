@@ -49,29 +49,33 @@ class ObstacleAvoid(Node):
     def __init__(self):
         super().__init__('obstacle_avoid')
 
-        self.declare_parameter('front_half_angle_deg', 28.0)
-        self.declare_parameter('side_sector_min_deg', 30.0)
-        self.declare_parameter('side_sector_max_deg', 120.0)
-        self.declare_parameter('avoid_distance', 0.90)
-        self.declare_parameter('clear_distance', 1.05)
-        self.declare_parameter('forward_front_min', 0.75)
-        self.declare_parameter('emergency_distance', 0.40)
-        self.declare_parameter('side_clear_distance', 0.38)
-        self.declare_parameter('side_emergency_distance', 0.25)
-        self.declare_parameter('clear_confirm_frames', 8)
-        self.declare_parameter('turn_time_sec', 1.80)
-        self.declare_parameter('forward_time_sec', 3.50)
-        self.declare_parameter('turn_speed', 0.45)
-        self.declare_parameter('emergency_turn_speed', 0.55)
-        self.declare_parameter('forward_speed', 0.10)
-        self.declare_parameter('rejoin_speed', 0.09)
-        self.declare_parameter('search_rejoin_speed', 0.08)
-        self.declare_parameter('search_rejoin_turn_speed', 0.35)
-        self.declare_parameter('rejoin_kp', 0.0025)
-        self.declare_parameter('rejoin_max_ang', 0.35)
-        self.declare_parameter('line_rejoin_error_thresh', 75.0)
-        self.declare_parameter('line_rejoin_confirm_frames', 5)
-        self.declare_parameter('publish_rate_hz', 20.0)
+        params = {
+            'front_half_angle_deg': 28.0,
+            'side_sector_min_deg': 30.0,
+            'side_sector_max_deg': 120.0,
+            'avoid_distance': 0.90,
+            'clear_distance': 1.05,
+            'forward_front_min': 0.75,
+            'emergency_distance': 0.40,
+            'side_clear_distance': 0.38,
+            'side_emergency_distance': 0.25,
+            'clear_confirm_frames': 8,
+            'turn_time_sec': 1.80,
+            'forward_time_sec': 3.50,
+            'turn_speed': 0.45,
+            'emergency_turn_speed': 0.55,
+            'forward_speed': 0.10,
+            'rejoin_speed': 0.09,
+            'search_rejoin_speed': 0.08,
+            'search_rejoin_turn_speed': 0.35,
+            'rejoin_kp': 0.0025,
+            'rejoin_max_ang': 0.35,
+            'line_rejoin_error_thresh': 75.0,
+            'line_rejoin_confirm_frames': 5,
+            'publish_rate_hz': 20.0,
+        }
+        for name, default in params.items():
+            self.declare_parameter(name, default)
 
         self.front_half_angle = math.radians(float(self.get_parameter('front_half_angle_deg').value))
         self.side_sector_min = math.radians(float(self.get_parameter('side_sector_min_deg').value))
@@ -115,17 +119,12 @@ class ObstacleAvoid(Node):
         self.last_motion_log_time = None
         self.turn_timeout_warned = False
         
-        # Multi-phase bypass variables
         self.angle_turned = 0.0
         self.forward_phase = 1
         self.phase_until = self.state_started_at
         self.phase_min_until = self.state_started_at
 
-        self.get_logger().info(
-            'ObstacleAvoid simplified with side clearance: '
-            f'avoid={self.avoid_distance:.2f} clear={self.clear_distance:.2f} '
-            f'forward_front_min={self.forward_front_min:.2f} side_clear={self.side_clear_distance:.2f}'
-        )
+        self.get_logger().info('Obstacle bypass node initialized.')
 
     def on_scan(self, msg: LaserScan):
         self.last_scan = msg
@@ -170,20 +169,17 @@ class ObstacleAvoid(Node):
         return 'RIGHT' if self.turn_dir > 0.0 else 'LEFT'
 
     def choose_turn_direction(self, ranges, angle_min, angle_inc):
-        # Calculate min distance in left-front sector (0 to 60 deg) and right-front sector (-60 to 0 deg)
+        # Steer towards the sector with greater clearance to avoid obstacle corner-clipping
         left_front = sector_min(ranges, angle_min, angle_inc, 0.0, math.radians(60.0))
         right_front = sector_min(ranges, angle_min, angle_inc, math.radians(-60.0), 0.0)
 
-        # If left front has more clearance (larger minimum distance), turn left (obstacle is on right).
-        # Otherwise, turn right (obstacle is on left).
         if left_front >= right_front:
-            self.turn_dir = 1.0  # Turn left
+            self.turn_dir = 1.0
         else:
-            self.turn_dir = -1.0 # Turn right
+            self.turn_dir = -1.0
 
         self.get_logger().info(
-            f'choose_turn_direction: left_front_clearance={left_front:.2f} '
-            f'right_front_clearance={right_front:.2f} -> chosen_direction={self.direction_name()}'
+            f'Bypass direction: {self.direction_name()} (L: {left_front:.2f}m, R: {right_front:.2f}m)'
         )
 
     def obstacle_side_clearance(self, left, right):
@@ -216,7 +212,6 @@ class ObstacleAvoid(Node):
         self.state_started_at = now
         self.state_until = now + Duration(seconds=max(0.0, duration_sec))
         
-        # Reset FSM variables cleanly on transitions to keep a clean slate
         self.clear_count = 0
         self.line_rejoin_count = 0
         self.turn_timeout_warned = False
@@ -229,12 +224,12 @@ class ObstacleAvoid(Node):
         if state == self.FORWARD_AROUND:
             self.forward_phase = 1
             self.phase_until = now + Duration(seconds=4.00)
-            self.get_logger().info('FORWARD_AROUND: starting Phase 1 (shift out for 4.00s)')
+            self.get_logger().info('FSM -> FORWARD_AROUND (Phase 1)')
             
-        msg = f'state_change={self.state_name()} chosen_direction={self.direction_name()}'
+        log_msg = f'FSM -> {self.state_name()} (Dir: {self.direction_name()})'
         if reason:
-            msg += f' transition_reason={reason}'
-        self.get_logger().info(msg)
+            log_msg += f' | Reason: {reason}'
+        self.get_logger().info(log_msg)
         self.state_pub.publish(Int32(data=int(self.state)))
 
     def line_centered(self):
@@ -244,14 +239,12 @@ class ObstacleAvoid(Node):
         if self.last_scan is None:
             return
 
-        # Periodically publish state to prevent race conditions
         self.state_pub.publish(Int32(data=int(self.state)))
 
         now = self.get_clock().now()
         front, left, right = self.scan_distances()
 
-        # Path-blocked check using a narrower front sector (+/- 12 degrees)
-        # to prevent false triggers from side obstacles we are actively bypassing.
+        # Use narrow aperture during detour to prevent false triggers from side walls
         path_front = sector_min(
             self.last_scan.ranges,
             self.last_scan.angle_min,

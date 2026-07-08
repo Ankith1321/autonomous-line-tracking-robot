@@ -6,25 +6,15 @@ This ROS 2 Humble workspace implements autonomous line following combined with a
 
 ## System Topology & Data Flow
 
-```text
-               +------------------+
-               |   Gazebo /scan   |
-               +--------+---------+
-                        |
-                        v
-               +--------+---------+
-               |  obstacle_avoid  +---------------+
-               +--------+---------+               |
-                        | (cmd_vel_obstacle)      | (safety_state)
-                        v                         v
-+----------+   +--------+---------+     +---------+--------+
-| Camera   |-->|  line_detector   |     |   cmd_vel_mux    |
-+----------+   +--------+---------+     +---------+--------+
-                        | (line_error)            ^
-                        v                         |
-               +--------+---------+               |
-               | line_controller  +---------------+
-               +------------------+ (cmd_vel_raw)
+```mermaid
+graph LR
+    Camera[/camera/image_raw/] --> Detector[line_detector]
+    Detector -->|line_error| Controller[line_controller]
+    Controller -->|cmd_vel_raw| Mux[cmd_vel_mux]
+    Lidar[/scan/] --> Safety[obstacle_avoid]
+    Safety -->|cmd_vel_obstacle| Mux
+    Safety -->|safety_state| Mux
+    Mux -->|cmd_vel| Robot((TurtleBot3))
 ```
 
 1. **Line Detection**: The `line_detector` node processes `/camera/image_raw` using OpenCV (HSV thresholding, morphological filtering, and contour selection) to compute the centroid deviation from the center of the frame (`/line_error`).
