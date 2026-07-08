@@ -11,23 +11,21 @@ setup(
          ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', [
-            'launch/obstacle_stop.launch.py',
             'launch/obstacle_avoid.launch.py',
         ]),
-
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='ankith',
     maintainer_email='ankithreddy580@gmail.com',
-    description='Safety node for TurtleBot3 (obstacle stop using LaserScan)',
+    description='Safety monitoring and obstacle bypass for TurtleBot3',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'obstacle_avoid = tb3_safety.obstacle_avoid:main',
-            # FORMAT: executable_name = package.module:function
-            'obstacle_stop = tb3_safety.obstacle_stop:main',
+            'cmd_vel_mux = tb3_safety.cmd_vel_mux:main',
+            'world_markers = tb3_safety.world_markers:main',
         ],
     },
 )

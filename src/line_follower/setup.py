@@ -26,10 +26,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'supervisor = line_follower.supervisor:main',
             'line_detector = line_follower.line_detector:main',
             'line_controller = line_follower.controller:main',
-            'simple_node = line_follower.simple_node:main',
         ],
     },
 )

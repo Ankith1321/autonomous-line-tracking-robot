@@ -15,3 +15,5 @@ build/
 install/
 log/
 logs/
+.dev_archive/
+.claude/

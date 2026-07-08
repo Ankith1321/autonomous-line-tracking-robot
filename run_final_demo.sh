@@ -10,7 +10,6 @@ LOG_DIR=/ws/logs
 PID_FILE=${LOG_DIR}/final_demo.pids
 GAZEBO_START_SCRIPT=/ws/start_yellow_line_world.sh
 RVIZ_CONFIG=/ws/rviz/yellow_line_demo.rviz
-MARKER_SCRIPT=/ws/world_markers.py
 
 wait_for_topic() {
   local topic="$1"
@@ -112,7 +111,7 @@ record_pid "obstacle_avoid" "$!"
 sleep 1
 
 echo "[CMD_VEL_MUX] Starting command velocity mux..."
-bash /ws/start_mux.sh > "${LOG_DIR}/cmd_vel_mux.log" 2>&1 &
+ros2 run tb3_safety cmd_vel_mux > "${LOG_DIR}/cmd_vel_mux.log" 2>&1 &
 record_pid "cmd_vel_mux" "$!"
 sleep 1
 
@@ -122,7 +121,7 @@ record_pid "rviz" "$!"
 sleep 1
 
 echo "[MARKERS] Starting RViz world marker publisher..."
-python3 "${MARKER_SCRIPT}" > "${LOG_DIR}/world_markers.log" 2>&1 &
+ros2 run tb3_safety world_markers > "${LOG_DIR}/world_markers.log" 2>&1 &
 record_pid "markers" "$!"
 sleep 1
 

@@ -93,8 +93,8 @@ class CmdVelMux(Node):
         self.pub.publish(out)
 
 
-def main():
-    rclpy.init()
+def main(args=None):
+    rclpy.init(args=args)
     node = CmdVelMux()
     try:
         rclpy.spin(node)
