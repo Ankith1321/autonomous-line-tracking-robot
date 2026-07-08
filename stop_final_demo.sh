@@ -11,8 +11,8 @@ pkill -f "line_detector" || true
 pkill -f "line_controller" || true
 pkill -f "obstacle_stop" || true
 pkill -f "obstacle_avoid" || true
-pkill -f "cmd_vel_mux.py" || true
-pkill -f "world_markers.py" || true
+pkill -f "cmd_vel_mux" || true
+pkill -f "world_markers" || true
 pkill -f "rviz2" || true
 pkill -f "gzserver" || true
 pkill -f "gzclient" || true
@@ -27,7 +27,8 @@ pkill -9 -f "gazebo" || true
 pkill -9 -f "turtlebot3" || true
 pkill -9 -f "camera_driver" || true
 pkill -9 -f "obstacle_avoid" || true
-pkill -9 -f "world_markers.py" || true
+pkill -9 -f "world_markers" || true
+pkill -9 -f "cmd_vel_mux" || true
 pkill -9 -f "rviz2" || true
 pkill -9 -f "robot_state_publisher" || true
 pkill -9 -f "spawn_entity" || true

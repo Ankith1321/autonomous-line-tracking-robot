@@ -263,6 +263,14 @@ class ObstacleAvoid(Node):
                     f'chosen_direction={self.direction_name()}'
                 )
                 self.enter_state(self.TURN_AWAY, self.turn_time, 'initial_turn')
+            else:
+                # Log telemetry periodically (every 1.0s) during normal line following
+                if self.last_motion_log_time is None or (now - self.last_motion_log_time).nanoseconds * 1e-9 >= 1.0:
+                    self.last_motion_log_time = now
+                    self.get_logger().info(
+                        f'state=IDLE front_min={front:.2f} left_clearance={left:.2f} '
+                        f'right_clearance={right:.2f} line_error={self.line_error}'
+                    )
             return
 
         obstacle_side = self.obstacle_side_clearance(left, right)
