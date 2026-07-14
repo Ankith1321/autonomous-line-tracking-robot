@@ -4,6 +4,22 @@ This ROS 2 Humble workspace implements autonomous line following combined with a
 
 ---
 
+## Demo Videos
+
+Below are screen recordings demonstrating the autonomous line follower and obstacle avoidance stack in action within the Gazebo simulation:
+
+### Demo 1: Full Course Autonomous Navigation & Obstacle Bypass
+[Download/Watch Video](media/demo_1.webm)
+
+<video src="media/demo_1.webm" width="100%" controls></video>
+
+### Demo 2: Autonomy Stack Performance
+[Download/Watch Video](media/demo_2.webm)
+
+<video src="media/demo_2.webm" width="100%" controls></video>
+
+---
+
 ## System Topology & Data Flow
 
 ```mermaid
@@ -28,6 +44,9 @@ graph LR
 
 ```text
 ws/
+├── media/                         # Demo videos and recordings
+│   ├── demo_1.webm
+│   └── demo_2.webm
 ├── .dev_archive/                  # Deprecated scripts, archives, and media files
 ├── rviz/                          # RViz visualization configuration profiles
 │   └── yellow_line_demo.rviz
